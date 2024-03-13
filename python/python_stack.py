@@ -21,14 +21,14 @@ class PythonStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
 
-        ddb = dynamodb.Table(self, 'TodosDB',
+        ddb = dynamodb.Table(self, 'navlogDB',
             partition_key=dynamodb.Attribute(
                 name='id',
                 type=dynamodb.AttributeType.STRING
             )
         )
 
-        getTodos = lambda_.Function(self, 'getTodos',
+        getNavlogs = lambda_.Function(self, 'getNavlogs',
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
             handler='get_todos.lambda_handler',
@@ -37,22 +37,10 @@ class PythonStack(Stack):
             },
             tracing=lambda_.Tracing.ACTIVE
         )
-        ddb.grant_read_data(getTodos)
+        ddb.grant_read_data(getNavlogs)
 
 
-        getTodo = lambda_.Function(self, 'getTodo', 
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
-            handler='get_todo.lambda_handler',
-            environment={
-                "DDB_TABLE": ddb.table_name
-            },
-            tracing=lambda_.Tracing.ACTIVE
-        )
-        ddb.grant_read_data(getTodo)
-
-
-        addTodo = lambda_.Function(self, 'addTodo',
+        addNavlog = lambda_.Function(self, 'addNavLog',
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
             handler='add_todo.lambda_handler',
@@ -61,42 +49,20 @@ class PythonStack(Stack):
             },
             tracing=lambda_.Tracing.ACTIVE
         )
-        ddb.grant_read_write_data(addTodo)
-
-        deleteTodo = lambda_.Function(self, 'deleteTodo', 
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
-            handler='delete_todo.lambda_handler',
-            environment={
-                "DDB_TABLE": ddb.table_name
-            },
-            tracing=lambda_.Tracing.ACTIVE
-        )
-        ddb.grant_read_write_data(deleteTodo)
-
-        updateTodo = lambda_.Function(self, 'updateTodo',
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
-            handler='update_todo.lambda_handler',
-            environment={
-                "DDB_TABLE": ddb.table_name
-            },
-            tracing=lambda_.Tracing.ACTIVE
-        )
-        ddb.grant_read_write_data(updateTodo)
+        ddb.grant_read_write_data(addNavlog)
 
         apiGateway = apigateway.RestApi(self, 'ApiGateway',
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_credentials=True,
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
+                allow_methods=["GET", "PUT", "OPTIONS"],
                 allow_headers=["Content-Type", "Authorization", "Content-Length", "X-Requested-With"]
             )
         )
 
         api = apiGateway.root.add_resource('api')
 
-        todos = api.add_resource('todos',
+        todos = api.add_resource('navlogs',
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_credentials=True,
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
@@ -104,20 +70,8 @@ class PythonStack(Stack):
                 allow_headers=["Content-Type", "Authorization", "Content-Length", "X-Requested-With"]
             )
         )
-        todos.add_method('GET', apigateway.LambdaIntegration(getTodos))
-        todos.add_method('POST', apigateway.LambdaIntegration(addTodo))
-
-        todoId = todos.add_resource('{id}', 
-            default_cors_preflight_options=apigateway.CorsOptions(
-                allow_credentials=True,
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
-                allow_headers=["Content-Type", "Authorization", "Content-Length", "X-Requested-With"]
-            )
-        )
-        todoId.add_method('GET', apigateway.LambdaIntegration(getTodo))
-        todoId.add_method('PUT', apigateway.LambdaIntegration(updateTodo))
-        todoId.add_method('DELETE', apigateway.LambdaIntegration(deleteTodo))
+        todos.add_method('GET', apigateway.LambdaIntegration(getNavlogs))
+        todos.add_method('POST', apigateway.LambdaIntegration(addNavlog))
 
         CfnOutput(self, ApiGatewayEndpointStackOutput, 
             value=apiGateway.url

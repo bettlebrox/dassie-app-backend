@@ -36,23 +36,25 @@ def lambda_handler(event, context):
         
         description = '' if 'description' not in payload else payload['description']
 
-        todo = {
+        navlog = {
             'id': uuid.uuid4().hex,
-            'completed': False,
             'created_at': datetime.datetime.now().isoformat(),
             'title': payload['title'],
-            'description': description
+            'type': payload['type'],
+            'tabId': payload['tabId'],
+            'timestamp': payload['timestamp'],
+            'documentId': payload['documentId']
         }
 
         ddb_response = ddb_table.put_item(
-            Item=todo
+            Item=navlog
         )
 
         logger.info('DDB Response: {}'.format(ddb_response))
 
         response = {
             'statusCode': 201,
-            'body': json.dumps(todo)
+            'body': json.dumps(navlog)
         }
         logger.info("Response: %s", response)
 

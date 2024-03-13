@@ -1,6 +1,6 @@
 """
-File: test_get_todo.py
-Description: Runs a test for our 'get_todo' Lambda
+File: test_get_todos.py
+Description: Runs a test for our 'get_todos' Lambda
 """
 import os
 import sys
@@ -11,7 +11,7 @@ from moto import mock_dynamodb
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)),"../../../python/lambda"))
 
-from get_todo import lambda_handler
+from get_navlogs import lambda_handler
 
 @pytest.fixture(scope='function')
 def aws_credentials():
@@ -33,21 +33,9 @@ def test_initialization(aws_credentials):
 
     assert payload['statusCode'] == 500
 
-def test_empty_event(aws_credentials):
-    event = {}
-    context = None
-
-    payload = lambda_handler(event, context)
-
-    assert payload['statusCode'] == 400
-
 @mock_dynamodb
 def test_valid_request(aws_credentials):
-    event = { 'pathParameters':
-        {
-            'id': '123'
-        }
-    }
+    event = {}
     context = None
 
     create_mock_ddb_table()
@@ -55,6 +43,8 @@ def test_valid_request(aws_credentials):
     payload = lambda_handler(event, context)
 
     assert payload['statusCode'] == 200
+
+
 
 @mock_dynamodb
 def create_mock_ddb_table():

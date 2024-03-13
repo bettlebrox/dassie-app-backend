@@ -1,0 +1,11 @@
+.venv/
+cdk.out/
+python/__pycache__/
+test_unit_coverage.xml
+test_unit_results.xml
+python/lambda/__pycache__/
+tests/unit/lambdas/__pycache__/
+tests/unit/cdk/__pycache__/
+tests/integ/__pycache__/
+__pycache__/
+.coverage
