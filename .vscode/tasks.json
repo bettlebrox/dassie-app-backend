@@ -1,0 +1,36 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "python: setup",
+            "detail": "python activate virtualenv and install requirements",
+            "type": "shell",
+            "command": "python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt",
+            "problemMatcher": []
+        },
+        {
+            "label": "python: run unit tests",
+            "detail": "python run unit tests",
+            "type": "shell",
+            "command": "pytest --junitxml=test_unit_results.xml --cov-report xml:test_unit_coverage.xml --cov=. tests/unit",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "python: run integration tests",
+            "detail": "python run integration tests",
+            "type": "shell",
+            "command": "pytest --junitxml=test_integ_results.xml --cov-report xml:test_integ_coverage.xml --cov=. tests/integ",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "cdk: synth",
+            "detail": "cdk synth",
+            "type": "shell",
+            "command": "cdk synth",
+            "group": "test",
+            "problemMatcher": []
+        },
+    ]
+}

@@ -1,0 +1,14 @@
+{
+  "script": [
+    "for directory in /projects/* ; do",
+    "  if [ -d \"$directory/.cloud9/runners\" ]; then",
+    "    REPOSITORY_DIR=$directory",
+    "  fi",
+    "done",
+    "echo $REPOSITORY_DIR",
+    "cd $REPOSITORY_DIR",
+    "source .venv/bin/activate",
+    "pytest --junitxml=test_unit_results.xml --cov-report xml:test_unit_coverage.xml --cov=. tests/unit"
+  ],
+  "info": "This runner will execute unit tests."
+}

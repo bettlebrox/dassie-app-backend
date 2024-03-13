@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug current test file",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}"
+            ]
+        },
+        {
+            "name": "Debug all test files",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest"
+        }
+    ]
+}

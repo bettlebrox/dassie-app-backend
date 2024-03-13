@@ -1,0 +1,15 @@
+{
+  "script": [
+    "for directory in /projects/* ; do",
+    "  if [ -d \"$directory/.cloud9/runners\" ]; then",
+    "    REPOSITORY_DIR=$directory",
+    "  fi",
+    "done",
+    "echo $REPOSITORY_DIR",
+    "cd $REPOSITORY_DIR",
+    "python3 -m venv .venv",
+    "source .venv/bin/activate",
+    "pip install -r requirements.txt"
+  ],
+  "info": "This runner will create a virtualenv, and install the required dependencies."
+}
