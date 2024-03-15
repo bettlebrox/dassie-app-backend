@@ -31,7 +31,7 @@ class PythonStack(Stack):
         getNavlogs = lambda_.Function(self, 'getNavlogs',
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
-            handler='get_todos.lambda_handler',
+            handler='get_navlogs.lambda_handler',
             environment={
                 "DDB_TABLE": ddb.table_name
             },
@@ -43,7 +43,7 @@ class PythonStack(Stack):
         addNavlog = lambda_.Function(self, 'addNavLog',
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), 'python/lambda')),
-            handler='add_todo.lambda_handler',
+            handler='add_navlog.lambda_handler',
             environment={
                 "DDB_TABLE": ddb.table_name
             },

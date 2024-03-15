@@ -50,11 +50,11 @@ def test_missing_title(aws_credentials):
 
     body = json.loads(payload['body'])
 
-    assert body['message'] == 'Title missing'
+    assert body['message'] == "Missing required keys:['title', 'type', 'tabId', 'timestamp', 'documentId']"
 
 @mock_dynamodb
-def test_valid_request(aws_credentials):
-    event = { 'body': '{"title": "Unit Testing"}' }
+def test_valid_navlog_request(aws_credentials):
+    event = { 'body': '{"type":"navigation","title":"New Tab","tabId":"529522941","timestamp":"1710432439145.628","documentId":"BCD99AE78F0EAA0A1D1B4BE9D1AE9825","url":"chrome://new-tab-page/","transitionType":"typed"}' }
     context = None
 
     create_mock_ddb_table()
@@ -64,6 +64,7 @@ def test_valid_request(aws_credentials):
     payload = lambda_handler(event, context)
 
     assert payload['statusCode'] == 201
+
 
 @mock_dynamodb
 def create_mock_ddb_table():
