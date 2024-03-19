@@ -20,7 +20,13 @@ def apiEndpoint() -> str:
     return get_api_endpoint(stack_name)
 
 
-def test_get_all_todos(apiEndpoint: str):
+"""Tests getting all navlogs from the API endpoint.
+
+Verifies the endpoint returns 200 status and the expected response.
+"""
+
+
+def test_get_all_navlogs(apiEndpoint: str):
 
     stackName = stack_name
     http = urllib3.PoolManager(num_pools=3)

@@ -11,17 +11,22 @@ logger.setLevel(logging.INFO)
 required_keys = ["title", "type", "tabId", "timestamp", "documentId"]
 
 
+"""
+lambda_handler handles the API request to add a new navlog item to DynamoDB.
+
+It validates the request body contains the required keys, constructs a navlog item, 
+and saves it to DynamoDB. Returns 201 on success, 400 for bad requests, or 500 on errors.
+"""
+
+
 def lambda_handler(event, context):
     try:
         logger.info("Event: {}".format(event))
-
         table_name = os.getenv("DDB_TABLE")
         if not table_name:
             raise Exception("Table name missing")
-
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
-
         try:
             payload = json.loads(event["body"])
         except Exception as error:
@@ -39,9 +44,6 @@ def lambda_handler(event, context):
                     {"message": "Missing required keys:{0}".format(missing_keys)}
                 ),
             }
-
-        description = "" if "description" not in payload else payload["description"]
-
         navlog = {
             "id": uuid.uuid4().hex,
             "created_at": datetime.datetime.now().isoformat(),
@@ -58,14 +60,10 @@ def lambda_handler(event, context):
             ),
             "url": payload["url"],
         }
-
         ddb_response = ddb_table.put_item(Item=navlog)
-
         logger.info("DDB Response: {}".format(ddb_response))
-
         response = {"statusCode": 201, "body": json.dumps(navlog)}
         logger.info("Response: %s", response)
-
         return response
 
     except Exception as error:
