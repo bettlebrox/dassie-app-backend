@@ -14,9 +14,11 @@ import pytest
 test_id = ""
 random_title = ""
 
+
 @pytest.fixture()
 def apiEndpoint() -> str:
     return get_api_endpoint(stack_name)
+
 
 def test_get_all_todos(apiEndpoint: str):
 
@@ -40,12 +42,15 @@ def test_add_todo(apiEndpoint: str):
 
     todo = json.dumps(
         {
-            "type": "navigation",
+            "type": "content",
             "title": random_title,
             "tabId": "529522941",
             "timestamp": "1710432439145.628",
             "documentId": "BCD99AE78F0EAA0A1D1B4BE9D1AE9825",
             "transitionType": "typed",
+            "body_text": "some text from doc",
+            "url": "https://bob.com",
+            "body_inner_html": '\\"\\"<script aria-hidden=\\"true\\" nonce=\\"\\">window.wiz_progress&&window.wiz_progress;',
         }
     )
 
@@ -53,7 +58,12 @@ def test_add_todo(apiEndpoint: str):
         "POST", apiEndpoint, headers={"Content-Type": "application/json"}, body=todo
     )
 
-    assert response.status == 201
+    assert (
+        response.status == 201
+    ), f"""
+        body: {response.data}
+        {response.status} != 201
+        """
 
 
 def get_api_endpoint(stackName):
