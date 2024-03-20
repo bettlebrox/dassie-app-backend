@@ -4,7 +4,7 @@ on: [push]
 
 env:
   AWS_REGION: eu-west-1
-  
+
 permissions:
   id-token: write
   contents: read
@@ -16,7 +16,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: <arn:aws:iam::559845934392:oidc-provider/token.actions.githubusercontent.com>
+          role-to-assume: <arn:aws:iam::559845934392:role/GitHubAction-AssumeRoleWithAction>
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
           aws-region: ${{ env.AWS_REGION }}
       # Hello from AWS: WhoAmI
