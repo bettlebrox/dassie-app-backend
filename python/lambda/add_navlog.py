@@ -27,6 +27,7 @@ def lambda_handler(event, context):
             raise Exception("Table name missing")
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
+        logger.info("Adding navlog to table: {}".format(table_name))
         try:
             payload = json.loads(event["body"])
         except Exception as error:

@@ -26,6 +26,7 @@ def lambda_handler(event, context):
             raise Exception("Table name missing")
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
+        logger.info("Scanning table: {}".format(table_name))
         items = ddb_table.scan()
         logger.info("DDB Response: {}".format(items))
         if "Items" in items:

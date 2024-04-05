@@ -27,7 +27,7 @@ class UUIDEncoder(json.JSONEncoder):
 
 def lambda_handler(event, context):
     try:
-        logger.info("Event themes: {}".format(event))
+        logger.info("Event wenny themes: {}".format(event))
         secretsmanager = boto3.client("secretsmanager")
         get_secret_value_response = secretsmanager.get_secret_value(
             SecretId=os.environ["DB_SECRET_ARN"]

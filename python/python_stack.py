@@ -81,6 +81,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
+            layers=[reqs_layer],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
