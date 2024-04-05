@@ -6,9 +6,7 @@ import urllib3
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../"))
 
-from app import stack_name
 import pytest
 
 test_id = ""
@@ -17,7 +15,12 @@ random_title = ""
 
 @pytest.fixture()
 def apiEndpoint() -> str:
-    return get_api_endpoint(stack_name)
+    return get_api_endpoint()
+
+
+@pytest.fixture()
+def apiThemeEndpoint() -> str:
+    return get_api_endpoint("themes")
 
 
 """Tests getting all navlogs from the API endpoint.
@@ -27,25 +30,51 @@ Verifies the endpoint returns 200 status and the expected response.
 
 
 def test_get_all_navlogs(apiEndpoint: str):
-
-    stackName = stack_name
     http = urllib3.PoolManager(num_pools=3)
-
     if not apiEndpoint:
-        apiEndpoint = get_api_endpoint(stackName)
-
+        apiEndpoint = get_api_endpoint()
     # Testing getting all todos
     response = http.request("GET", apiEndpoint)
-
     assert response.status == 200
 
 
-def test_add_todo(apiEndpoint: str):
+def test_get_all_themes(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
+    # Testing getting all todos
+    response = http.request("GET", apiThemeEndpoint)
+    assert response.status == 200
 
+
+def test_add_theme(apiThemeEndpoint: str):
+    http = urllib3.PoolManager(num_pools=3)
     global random_title
     random_title = "Integration Testing {}".format(uuid4().hex)
+    theme = json.dumps(
+        {
+            "id": str(uuid4()),
+            "title": random_title,
+            "summary": "some summary of {}".format(random_title),
+            "url": "https://bob.com",
+        }
+    )
+    response = http.request(
+        "POST",
+        apiThemeEndpoint,
+        headers={"Content-Type": "application/json"},
+        body=theme,
+    )
+    assert (
+        response.status == 201
+    ), f"""
+        body: {response.data}
+        {response.status} != 201
+        """
 
+
+def test_add_navlog(apiEndpoint: str):
+    http = urllib3.PoolManager(num_pools=3)
+    global random_title
+    random_title = "Integration Testing {}".format(uuid4().hex)
     todo = json.dumps(
         {
             "type": "content",
@@ -59,11 +88,9 @@ def test_add_todo(apiEndpoint: str):
             "body_inner_html": '\\"\\"<script aria-hidden=\\"true\\" nonce=\\"\\">window.wiz_progress&&window.wiz_progress;',
         }
     )
-
     response = http.request(
         "POST", apiEndpoint, headers={"Content-Type": "application/json"}, body=todo
     )
-
     assert (
         response.status == 201
     ), f"""
@@ -72,16 +99,6 @@ def test_add_todo(apiEndpoint: str):
         """
 
 
-def get_api_endpoint(stackName):
-    cloudFormationClient = boto3.client("cloudformation", region_name="eu-west-1")
-    stack = cloudFormationClient.describe_stacks(StackName=stackName)
-
-    stack = stack["Stacks"][0]
-
-    apiEndpoint = next(
-        item for item in stack["Outputs"] if item["OutputKey"] == "ApiEndpoint"
-    )
-
-    apiEndpoint = apiEndpoint["OutputValue"] + "/api"
-
-    return apiEndpoint + "/navlogs"
+def get_api_endpoint(resourcename="navlogs"):
+    apiEndpoint = "http://127.0.0.1:3000/api"
+    return apiEndpoint + "/{}".format(resourcename)

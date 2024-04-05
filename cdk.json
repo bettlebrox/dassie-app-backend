@@ -36,5 +36,12 @@
       "aws",
       "aws-cn"
     ]
+  },
+  "assetDockerVolumeMount": "/asset",
+  "docker":{
+    "volumes":[
+      "${PWD}:/asset"
+    ],
+    "network": "host"
   }
 }

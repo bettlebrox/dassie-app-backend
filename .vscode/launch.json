@@ -3,7 +3,7 @@
     "configurations": [
         {
             "name": "Debug current test file",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
@@ -12,9 +12,24 @@
         },
         {
             "name": "Debug all test files",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "pytest"
+        },
+        {
+            "name": "SAM CLI Python",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 9999
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/python/lambda",
+                    "remoteRoot": "."
+                }
+            ]
         }
     ]
 }
