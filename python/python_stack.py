@@ -28,7 +28,7 @@ class PythonStack(Stack):
             self,
             "dassie",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_11_9
+                version=rds.AuroraPostgresEngineVersion.VER_13_12
             ),
             vpc=vpc,
             enable_data_api=True,
@@ -40,6 +40,12 @@ class PythonStack(Stack):
             partition_key=dynamodb.Attribute(
                 name="id", type=dynamodb.AttributeType.STRING
             ),
+        )
+        ddb.add_global_secondary_index(
+            partition_key=dynamodb.Attribute(
+                name="type", type=dynamodb.AttributeType.STRING
+            ),
+            index_name="type-index",
         )
         reqs_layer = lambda_python.PythonLayerVersion(
             self,
