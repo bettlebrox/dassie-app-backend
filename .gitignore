@@ -16,3 +16,4 @@ python/lambda/debugpy
 test_integ_coverage.xml
 test_integ_results.xml
 python/lambda/debugpy-1.8.1.dist-info
+output

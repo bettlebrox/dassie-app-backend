@@ -21,7 +21,17 @@ class NavlogService:
 
     def get_content_navlogs(self):
         ddb_table = self.dynamodb.Table(self.TABLE_NAME)
-        items = ddb_table.query(
+        response = ddb_table.query(
             IndexName="type-index", KeyConditionExpression=Key("type").eq("content")
         )
-        return items["Items"]
+        items = response["Items"]
+
+        while "LastEvaluatedKey" in response:
+            response = ddb_table.query(
+                IndexName="type-index",
+                KeyConditionExpression=Key("type").eq("content"),
+                ExclusiveStartKey=response["LastEvaluatedKey"],
+            )
+            items += response["Items"]
+
+        return items

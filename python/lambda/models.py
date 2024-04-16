@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from typing import List
 import uuid
 from sqlalchemy.orm import declarative_base
 import enum
@@ -77,20 +78,90 @@ class Article(Base):
     _title = Column(String)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
+    _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    _logged_at = Column(DateTime)
     _url = Column(String(2000))
+    _text = Column(String)
     _themes = relationship("Theme", secondary="association", back_populates="_related")
     _embedding = Column(Vector(1536))
 
-    def __init__(self, title: str, summary: str, url: str):
+    def __init__(
+        self,
+        title: str,
+        summary: str,
+        url: str,
+        logged_at: datetime = None,
+        text: str = None,
+    ):
         self._title = quote_plus(title)
         self._summary = summary
         self._url = url
+        self._logged_at = logged_at
+        self._text = text
 
-    def set_embedding(self, embedding):
-        self._embedding = embedding
+    @property
+    def id(self):
+        return self._id
 
-    def get_original_title(self):
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, value):
+        self._title = quote_plus(value)
+
+    @property
+    def summary(self):
+        return self._summary
+
+    @summary.setter
+    def summary(self, value):
+        self._summary = value
+
+    @property
+    def created_at(self):
+        return self._created_at
+
+    @property
+    def url(self):
+        return self._url
+
+    @url.setter
+    def url(self, value):
+        self._url = value
+
+    @property
+    def themes(self):
+        return self._themes
+
+    @property
+    def embedding(self):
+        return self._embedding
+
+    @embedding.setter
+    def embedding(self, value):
+        self._embedding = value
+
+    @property
+    def original_title(self):
         return unquote_plus(self._title)
+
+    @property
+    def text(self):
+        return self._text
+
+    @text.setter
+    def text(self, value):
+        self._text = value
+
+    @property
+    def logged_at(self):
+        return self._logged_at
+
+    @logged_at.setter
+    def logged_at(self, value):
+        self._logged_at = value
 
 
 class ThemeType(enum.Enum):
@@ -125,7 +196,74 @@ class Theme(Base):
         self._title = quote_plus(title)
         self._summary = summary
 
-    def get_original_title(self):
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def source(self):
+        return self._source
+
+    @source.setter
+    def source(self, value):
+        self._source = value
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, value):
+        self._title = value
+
+    @property
+    def summary(self):
+        return self._summary
+
+    @summary.setter
+    def summary(self, value):
+        self._summary = value
+
+    @property
+    def created_at(self):
+        return self._created_at
+
+    @property
+    def updated_at(self):
+        return self._updated_at
+
+    @property
+    def related(self):
+        return self._related
+
+    @related.setter
+    def related(self, value: List[Article]):
+        self._related = value
+
+    @property
+    def recurrent(self):
+        return self._recurrent
+
+    @property
+    def sporadic(self):
+        return self._sporadic
+
+    @property
+    def original_title(self):
+        return unquote_plus(self._title)
+
+    def to_json(self):
+        return json.dumps(
+            {
+                "id": str(self.id),
+                "title": self.title,
+                "summary": self.summary,
+                "created_at": self.created_at.isoformat() if self.created_at else "",
+            }
+        )
+
+    @property
+    def original_title(self):
         return unquote_plus(self._title)
 
     def to_json(self):
