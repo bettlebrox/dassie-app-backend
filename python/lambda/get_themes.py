@@ -1,12 +1,9 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Query
-from contextlib import closing
+from urllib.parse import unquote_plus
 import logging
 import boto3
 import os
 import json
-
-from models import Theme
+from repos import ThemeRepository
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -16,23 +13,47 @@ get_secret_value_response = secretsmanager.get_secret_value(
     SecretId=os.environ["DB_SECRET_ARN"]
 )
 secret = json.loads(get_secret_value_response["SecretString"])
-# Connect to Aurora
-engine = create_engine(
-    f"postgresql://{secret['username']}:{secret['password']}@{os.environ['DB_CLUSTER_ENDPOINT']}/{secret['dbname']}",
-    pool_timeout=30,
-)
-Session = sessionmaker(bind=engine)
 
 
 def lambda_handler(event, context):
-    with closing(Session()) as session:
-        try:
-            logger.debug("Event: {} Context: {}".format(event, context))
-            result = Query(Theme, session=session).all()
-            return {
-                "statusCode": 200,
-                "body": "[{}]".format(",".join([theme.to_json() for theme in result])),
-            }
-        except Exception as error:
-            logger.info("Error: {}".format(error))
-            return {"statusCode": 500, "body": {"message": str(error)}}
+    try:
+        params = event["queryStringParameters"]
+        sort_field = (
+            params["sortField"]
+            if params is not None and "sortField" in params
+            else "top"
+        )
+        sort_order = (
+            params["sortOrder"]
+            if params is not None and "sortOrder" in params
+            else "asc"
+        )
+        title = event["path"].split("/")[-1]
+        logger.debug("Event: {} Context: {}".format(event, context))
+        theme_repo = ThemeRepository(
+            secret["username"],
+            secret["password"],
+            secret["dbname"],
+            os.environ["DB_CLUSTER_ENDPOINT"],
+        )
+        result = []
+        success_response = {"statusCode": 200, "body": None}
+        if title != "themes":
+            # get a specfic theme
+            theme = theme_repo.get_by_title(unquote_plus(title))
+            if theme is not None:
+                success_response["body"] = theme.json(related=True)
+                return success_response
+
+        # return all themes
+        if sort_field == "top":
+            result = theme_repo.get_top(10)
+        else:
+            result = theme_repo.get_recent(10)
+        success_response["body"] = "[{}]".format(
+            ",".join([theme.json() for theme in result])
+        )
+        return success_response
+    except Exception as error:
+        logger.error("Error: {}".format(error), exc_info=True)
+        return {"statusCode": 500, "body": {"message": str(error)}}

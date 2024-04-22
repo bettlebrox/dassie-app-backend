@@ -5,12 +5,15 @@ import json
 import urllib3
 import sys
 import os
+import warnings
 
 
 import pytest
 
 test_id = ""
 random_title = ""
+LOCAL_API = "http://127.0.0.1:3000/api"
+PRD_API = "https://p5cgnlejzk.execute-api.eu-west-1.amazonaws.com/prod"
 
 
 @pytest.fixture()
@@ -29,20 +32,26 @@ Verifies the endpoint returns 200 status and the expected response.
 """
 
 
-def test_get_all_navlogs(apiEndpoint: str):
+def test_get_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
-    if not apiEndpoint:
-        apiEndpoint = get_api_endpoint()
     # Testing getting all todos
-    response = http.request("GET", apiEndpoint)
-    assert response.status == 200
+    response = http.request("GET", apiThemeEndpoint + "/sometitle")
+    assert (
+        200 == response.status
+    ), f"""
+    Http status not as expected
+    body: {response.data}"""
 
 
 def test_get_all_themes(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     # Testing getting all todos
     response = http.request("GET", apiThemeEndpoint)
-    assert response.status == 200
+    assert (
+        200 == response.status
+    ), f"""
+    Http status not as expected
+    body: {response.data}"""
 
 
 def test_add_theme(apiThemeEndpoint: str):
@@ -67,7 +76,6 @@ def test_add_theme(apiThemeEndpoint: str):
         response.status == 201
     ), f"""
         body: {response.data}
-        {response.status} != 201
         """
 
 
@@ -95,10 +103,13 @@ def test_add_navlog(apiEndpoint: str):
         response.status == 201
     ), f"""
         body: {response.data}
-        {response.status} != 201
         """
 
 
 def get_api_endpoint(resourcename="navlogs"):
-    apiEndpoint = "http://127.0.0.1:3000/api"
+    apiEndpoint = LOCAL_API  # PRD_API  # LOCAL_API
+    if apiEndpoint.startswith("http://127.0.0.1"):
+        warnings.warn(
+            "Using local API endpoint for testing. Ensure sam local start-api is running before running tests."
+        )
     return apiEndpoint + "/{}".format(resourcename)

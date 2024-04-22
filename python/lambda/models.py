@@ -99,6 +99,22 @@ class Article(Base):
         self._logged_at = logged_at
         self._text = text
 
+    def json(self):
+        return {
+            "id": str(self._id),
+            "title": self._title,
+            "original_title": unquote_plus(self._title),
+            "summary": self._summary,
+            "created_at": (
+                "" if self._created_at is None else self._created_at.isoformat()
+            ),
+            "url": self._url,
+            "logged_at": (
+                "" if self._logged_at is None else self._logged_at.isoformat()
+            ),
+            "text": "" if self._text is None else self._text[:200],
+        }
+
     @property
     def id(self):
         return self._id
@@ -181,6 +197,7 @@ class Theme(Base):
     _title = Column(String)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
+    _logged_at = Column(DateTime)
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _related = relationship(
         "Article", secondary="association", order_by=Article._created_at
@@ -252,26 +269,27 @@ class Theme(Base):
     def original_title(self):
         return unquote_plus(self._title)
 
-    def to_json(self):
-        return json.dumps(
-            {
-                "id": str(self.id),
-                "title": self.title,
-                "summary": self.summary,
-                "created_at": self.created_at.isoformat() if self.created_at else "",
-            }
-        )
+    def json(self, related=False):
+        json_obj = {
+            "id": str(self.id),
+            "title": self.title,
+            "original_title": self.original_title,
+            "summary": self.summary,
+            "created_at": self.created_at.isoformat() if self.created_at else "",
+            "source": self.source.value,
+        }
+        if related:
+            json_obj["related"] = [a.json() for a in self.related[:10]]
+        return json.dumps(json_obj)
 
     @property
     def original_title(self):
         return unquote_plus(self._title)
 
-    def to_json(self):
-        return json.dumps(
-            {
-                "id": str(self.id),
-                "title": self.title,
-                "summary": self.summary,
-                "created_at": self.created_at.isoformat() if self.created_at else "",
-            }
-        )
+    @property
+    def logged_at(self):
+        return self._logged_at
+
+    @logged_at.setter
+    def logged_at(self, value):
+        self._logged_at = value

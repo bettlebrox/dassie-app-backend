@@ -3,9 +3,9 @@ import copy
 from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import quote_plus
-from sqlalchemy import create_engine, func, select
-from models import Article, Theme, Association, Base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, func
+from models import Article, Theme, Association, Base, ThemeType
+from sqlalchemy.orm import sessionmaker, joinedload
 
 
 class BasePostgresRepository:
@@ -126,11 +126,34 @@ class ThemeRepository(BasePostgresRepository):
         super().__init__(username, password, dbname, db_cluster_endpoint)
         self.model = Theme
 
+    def get_all(self):
+        return super().get_all()
+
+    def get_recent(self, limit: int = 10):
+        with closing(self.session()) as session:
+            return (
+                session.query(self.model)
+                .filter(self.model._source == ThemeType.TOP)
+                .order_by(self.model._created_at)
+                .limit(limit)
+            )
+
+    def get_top(self, limit: int = 10):
+        with closing(self.session()) as session:
+            join_query = session.query(self.model).outerjoin(Association)
+            query = join_query.group_by(self.model._id).order_by(
+                func.count(Association.article_id).desc()
+            )
+            return query.limit(limit)
+
     def get_by_title(self, title: str):
-        titles = self.get_by_titles([title])
-        if len(titles) > 0:
-            return titles[0]
-        return None
+        with closing(self.session()) as session:
+            return (
+                session.query(self.model)
+                .options(joinedload(self.model._related))
+                .filter(self.model._title == quote_plus(title))
+                .first()
+            )
 
     def get_by_titles(self, titles: List[str]):
         with closing(self.session()) as session:

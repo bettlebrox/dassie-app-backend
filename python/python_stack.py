@@ -12,6 +12,9 @@ import aws_cdk.aws_ec2 as ec2
 import aws_cdk.aws_logs as logs
 import aws_cdk.aws_logs_destinations as destinations
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
+import aws_cdk.aws_cognito as cognito
+import aws_cdk.aws_iam as iam
+
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -135,9 +138,25 @@ class PythonStack(Stack):
         ddb.grant_read_write_data(addNavlog)
 
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
+        api_role = iam.Role.from_role_arn(
+            self,
+            "google_cognito",
+            role_arn="arn:aws:sts::559845934392:assumed-role/google_cognito",
+        )
+        policy = iam.PolicyStatement(
+            sid="allow_google_cognito",
+            effect=iam.Effect.ALLOW,
+            actions=["execute-api:Invoke"],
+            resources=[
+                f"arn:aws:execute-api:eu-west-1:559845934392:p5cgnlejzk/prod/*/*/*"
+            ],
+            conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
+            principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
+        )
         apiGateway = apigateway.RestApi(
             self,
             "ApiGateway",
+            policy=iam.PolicyDocument(statements=[policy]),
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_credentials=True,
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
@@ -194,10 +213,18 @@ class PythonStack(Stack):
                 ],
             ),
         )
-        todos.add_method("GET", apigateway.LambdaIntegration(getNavlogs))
-        todos.add_method("POST", apigateway.LambdaIntegration(addNavlog))
+        todos.add_method(
+            "GET",
+            apigateway.LambdaIntegration(getNavlogs),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+        todos.add_method(
+            "POST",
+            apigateway.LambdaIntegration(addNavlog),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
 
-        todos = api.add_resource(
+        themes = api.add_resource(
             "themes",
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_credentials=True,
@@ -211,8 +238,23 @@ class PythonStack(Stack):
                 ],
             ),
         )
-        todos.add_method("GET", apigateway.LambdaIntegration(getThemes))
-        todos.add_method("POST", apigateway.LambdaIntegration(addTheme))
+        themes.add_method(
+            "GET",
+            apigateway.LambdaIntegration(getThemes),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+        themes.add_method(
+            "POST",
+            apigateway.LambdaIntegration(addTheme),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+
+        themes_sub = themes.add_resource("{title}")
+        themes_sub.add_method(
+            "GET",
+            apigateway.LambdaIntegration(getThemes),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
 
         CfnOutput(self, ApiGatewayEndpointStackOutput, value=apiGateway.url)
 

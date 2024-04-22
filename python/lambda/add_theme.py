@@ -45,7 +45,7 @@ def lambda_handler(event, context):
             theme = Theme(payload["title"], payload["summary"])
             session.add(theme)
             session.commit()
-            return {"statusCode": 201, "body": theme.to_json()}
+            return {"statusCode": 201, "body": theme.json()}
     except Exception as error:
         logger.error("Error: {}".format(error))
         return {"statusCode": 500, "body": {"message": str(error)}}
