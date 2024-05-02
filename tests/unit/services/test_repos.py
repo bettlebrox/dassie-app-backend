@@ -280,7 +280,7 @@ def test_get_all_themes():
 def test_get_theme_by_title():
     # Create a mock session
     mock_session = MagicMock()
-    mock_session.return_value.query.return_value.filter.return_value.all.return_value = [
+    mock_session.return_value.query.return_value.options.return_value.filter.return_value.first.return_value = [
         Theme(title="Test Theme")
     ]
 
@@ -323,17 +323,19 @@ def test_add_related_theme():
     # Create the repository and set the mock session
     repo = ThemeRepository("username", "password", "dbname", "db_cluster_endpoint")
     repo.session = mock_session
-
+    theme = Theme(title="Test Theme")
+    mock_session.return_value.query.return_value.options.return_value.filter.return_value.first.return_value = [
+        theme
+    ]
     # Create a new article and theme
     article = Article(
         title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
-    theme = Theme(title="Test Theme")
 
     # Call the add_related method
-    association = repo.add_realted(article, ["Test Theme"])
+    association = repo.add_related(article, ["Test Theme"])
 
     # Assert that the theme was added and the association was created
     mock_session.return_value.add.assert_called()

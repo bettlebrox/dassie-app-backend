@@ -1,4 +1,8 @@
 {
+  "getArticles": {
+    "DB_CLUSTER_ENDPOINT": "todoappbackendstack-nwbxl-dassie2b404273-65op3qscf7nd.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+    "DB_SECRET_ARN": "dassieSecret79403E04-ffZ6841JZBj3"
+  },
   "getThemes": {
     "DB_CLUSTER_ENDPOINT": "todoappbackendstack-nwbxl-dassie2b404273-65op3qscf7nd.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
     "DB_SECRET_ARN": "dassieSecret79403E04-ffZ6841JZBj3"
@@ -8,9 +12,11 @@
     "DB_SECRET_ARN": "dassieSecret79403E04-ffZ6841JZBj3"
   },
   "getNavlogs": {
-    "DDB_TABLE": "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L"
+    "DDB_TABLE": "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L",
+    "BUCKET_NAME": "todoappbackendstack-nwbxl-navlogimages0c68e55c-3ywwdtenerym"
   },
   "addNavLog": {
-    "DDB_TABLE": "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L"
+    "DDB_TABLE": "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L",
+    "BUCKET_NAME": "todoappbackendstack-nwbxl-navlogimages0c68e55c-3ywwdtenerym"
   }
 }

@@ -1,0 +1,2 @@
+WITH deleted as (delete from association where article_id in (SELECT article_id FROM "association" where theme_id = '6a3455ad-b55a-4a6c-b306-d6cd95d82c3e') returning article_id)
+delete from article where _id in (select * from deleted);

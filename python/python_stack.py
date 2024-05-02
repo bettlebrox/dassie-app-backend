@@ -9,6 +9,7 @@ import aws_cdk.aws_apigateway as apigateway
 import aws_cdk.aws_dynamodb as dynamodb
 import aws_cdk.aws_rds as rds
 import aws_cdk.aws_ec2 as ec2
+import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
 import aws_cdk.aws_logs_destinations as destinations
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
@@ -25,6 +26,12 @@ class PythonStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        bucket = s3.Bucket(
+            self,
+            "navlog-images",
+            versioned=True,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+        )
         vpc = ec2.Vpc(self, "AuroraVpc")
         # Create a new secret to store the master username and password for the Aurora Serverless cluster
         sql_db = rds.ServerlessCluster(
@@ -84,6 +91,27 @@ class PythonStack(Stack):
         sql_db.secret.grant_read(getThemes)
         nr_secret.grant_read(getThemes)
 
+        getArticles = lambda_.Function(
+            self,
+            "getArticles",
+            runtime=lambda_.Runtime.PYTHON_3_8,
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            handler="get_articles.lambda_handler",
+            vpc=vpc,
+            layers=[reqs_layer],
+            security_groups=sql_db.connections.security_groups,
+            environment={
+                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
+                "DB_SECRET_ARN": sql_db.secret.secret_arn,
+            },
+            tracing=lambda_.Tracing.ACTIVE,
+            timeout=Duration.seconds(45),
+        )
+        sql_db.grant_data_api_access(getArticles)
+        sql_db.connections.allow_default_port_from(getArticles)
+        sql_db.secret.grant_read(getArticles)
+        nr_secret.grant_read(getArticles)
+
         addTheme = lambda_.Function(
             self,
             "addTheme",
@@ -112,18 +140,9 @@ class PythonStack(Stack):
             security_group.add_ingress_rule(
                 getThemes.connections.security_groups[0], ec2.Port.tcp(5432)
             )
-
-        getNavlogs = lambda_.Function(
-            self,
-            "getNavlogs",
-            runtime=lambda_.Runtime.PYTHON_3_8,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="get_navlogs.lambda_handler",
-            environment={"DDB_TABLE": ddb.table_name},
-            tracing=lambda_.Tracing.ACTIVE,
-            timeout=Duration.seconds(15),
-        )
-        ddb.grant_read_data(getNavlogs)
+            security_group.add_ingress_rule(
+                getArticles.connections.security_groups[0], ec2.Port.tcp(5432)
+            )
 
         addNavlog = lambda_.Function(
             self,
@@ -131,11 +150,15 @@ class PythonStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_8,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
-            environment={"DDB_TABLE": ddb.table_name},
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(5),
+            environment={
+                "DDB_TABLE": ddb.table_name,
+                "BUCKET_NAME": bucket.bucket_name,
+            },
         )
         ddb.grant_read_write_data(addNavlog)
+        bucket.grant_read_write(addNavlog)
 
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
         api_role = iam.Role.from_role_arn(
@@ -204,7 +227,7 @@ class PythonStack(Stack):
             default_cors_preflight_options=apigateway.CorsOptions(
                 allow_credentials=True,
                 allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "PUT", "DELETE", "OPTIONS"],
+                allow_methods=["POST", "PUT", "DELETE", "OPTIONS"],
                 allow_headers=[
                     "Content-Type",
                     "Authorization",
@@ -214,13 +237,27 @@ class PythonStack(Stack):
             ),
         )
         todos.add_method(
-            "GET",
-            apigateway.LambdaIntegration(getNavlogs),
-            authorization_type=apigateway.AuthorizationType.IAM,
-        )
-        todos.add_method(
             "POST",
             apigateway.LambdaIntegration(addNavlog),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+        articles = api.add_resource(
+            "articles",
+            default_cors_preflight_options=apigateway.CorsOptions(
+                allow_credentials=True,
+                allow_origins=apigateway.Cors.ALL_ORIGINS,
+                allow_methods=["GET", "POST", "OPTIONS"],
+                allow_headers=[
+                    "Content-Type",
+                    "Authorization",
+                    "Content-Length",
+                    "X-Requested-With",
+                ],
+            ),
+        )
+        articles.add_method(
+            "GET",
+            apigateway.LambdaIntegration(getArticles),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 

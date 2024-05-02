@@ -4,10 +4,13 @@ import sys
 
 sys.path.append(
     os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "../../../python/services"
+        os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda/services"
     )
 )
 from navlogs_service import NavlogService
+
+TABLE_NAME = "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L"
+BUCKET_NAME = "todoappbackendstack-nwbxl-navlogimages0c68e55c-3ywwdtenerym"
 
 
 def test_get_navlogs():
@@ -21,8 +24,8 @@ def test_get_navlogs():
     table_mock.scan.return_value = {"Items": items}
 
     # Create an instance of NavlogService with the mock DynamoDB resource
-    navlog_service = NavlogService()
-    navlog_service.dynamodb = dynamodb_mock
+    navlog_service = NavlogService(TABLE_NAME, BUCKET_NAME)
+    navlog_service._dynamodb = dynamodb_mock
 
     # Call the get_navlogs method
     result = navlog_service.get_navlogs()

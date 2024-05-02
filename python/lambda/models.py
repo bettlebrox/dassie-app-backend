@@ -9,8 +9,16 @@ from sqlalchemy.dialects.postgresql import UUID
 from urllib.parse import quote_plus, unquote_plus
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
+from typing_extensions import Self
 
 Base = declarative_base()
+
+
+class JsonFunctionEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if hasattr(obj, "json"):
+            return obj.json(dump=False)
+        return super().default(obj)
 
 
 class Association(Base):
@@ -79,11 +87,13 @@ class Article(Base):
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
-    _logged_at = Column(DateTime)
+    _logged_at = Column(DateTime, index=True)
     _url = Column(String(2000))
     _text = Column(String)
     _themes = relationship("Theme", secondary="association", back_populates="_related")
     _embedding = Column(Vector(1536))
+    _image = Column(String)
+    _source_navlog = Column(String)
 
     def __init__(
         self,
@@ -99,8 +109,8 @@ class Article(Base):
         self._logged_at = logged_at
         self._text = text
 
-    def json(self):
-        return {
+    def json(self, dump=True) -> str:
+        json_obj = {
             "id": str(self._id),
             "title": self._title,
             "original_title": unquote_plus(self._title),
@@ -113,7 +123,11 @@ class Article(Base):
                 "" if self._logged_at is None else self._logged_at.isoformat()
             ),
             "text": "" if self._text is None else self._text[:200],
+            "source": self._source_navlog,
+            "image": self._image,
+            "themes": [theme.original_title for theme in self._themes],
         }
+        return json.dumps(json_obj) if dump else json_obj
 
     @property
     def id(self):
@@ -179,6 +193,22 @@ class Article(Base):
     def logged_at(self, value):
         self._logged_at = value
 
+    @property
+    def image(self):
+        return self._image
+
+    @image.setter
+    def image(self, value):
+        self._image = value
+
+    @property
+    def source_navlog(self):
+        return self._source_navlog
+
+    @source_navlog.setter
+    def source_navlog(self, value):
+        self._source_navlog = value
+
 
 class ThemeType(enum.Enum):
     SEARCH_TERM = "search_term"
@@ -188,6 +218,8 @@ class ThemeType(enum.Enum):
     PROPOSITION = "proposition"
     ARTICLE = "article"
     TOP = "top"
+    RECURRENT = "recurrent"
+    SPORADIC = "sporadic"
 
 
 class Theme(Base):
@@ -203,10 +235,21 @@ class Theme(Base):
         "Article", secondary="association", order_by=Article._created_at
     )
     _recurrent = relationship(
-        "Theme", secondary="recurrent", foreign_keys=[Recurrent.theme_id]
+        "Theme",
+        secondary="recurrent",
+        foreign_keys=[Recurrent.theme_id, Recurrent.related_id],
+        remote_side=[_id],
+        primaryjoin=Recurrent.theme_id == _id,
+        secondaryjoin=Recurrent.related_id == _id,
     )
+
     _sporadic = relationship(
-        "Theme", secondary="sporadic", foreign_keys=[Sporadic.theme_id]
+        "Theme",
+        secondary="sporadic",
+        foreign_keys=[Sporadic.theme_id, Sporadic.related_id],
+        remote_side=[_id],
+        primaryjoin=Sporadic.theme_id == _id,
+        secondaryjoin=Sporadic.related_id == _id,
     )
 
     def __init__(self, title, summary=None):
@@ -261,15 +304,23 @@ class Theme(Base):
     def recurrent(self):
         return self._recurrent
 
+    @recurrent.setter
+    def recurrent(self, value):
+        self._recurrent = value
+
     @property
     def sporadic(self):
         return self._sporadic
+
+    @sporadic.setter
+    def sporadic(self, value):
+        self._sporadic = value
 
     @property
     def original_title(self):
         return unquote_plus(self._title)
 
-    def json(self, related=False):
+    def json(self, related=False, dump=True):
         json_obj = {
             "id": str(self.id),
             "title": self.title,
@@ -279,8 +330,10 @@ class Theme(Base):
             "source": self.source.value,
         }
         if related:
-            json_obj["related"] = [a.json() for a in self.related[:10]]
-        return json.dumps(json_obj)
+            json_obj["related"] = self.related
+            json_obj["recurrent"] = self.recurrent
+            json_obj["sporadic"] = self.sporadic
+        return json.dumps(json_obj, cls=JsonFunctionEncoder) if dump else json_obj
 
     @property
     def original_title(self):

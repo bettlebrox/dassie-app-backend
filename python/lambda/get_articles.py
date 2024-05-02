@@ -1,9 +1,8 @@
-from urllib.parse import unquote_plus
 import logging
 import boto3
 import os
 import json
-from repos import ThemeRepository
+from repos import ArticleRepository
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -28,9 +27,9 @@ def lambda_handler(event, context):
             if params is not None and "sortOrder" in params
             else "asc"
         )
-        title = event["path"].split("/")[-1]
+        article_id = event["path"].split("/")[-1]
         logger.debug("Event: {} Context: {}".format(event, context))
-        theme_repo = ThemeRepository(
+        article_repo = ArticleRepository(
             secret["username"],
             secret["password"],
             secret["dbname"],
@@ -38,19 +37,16 @@ def lambda_handler(event, context):
         )
         result = []
         success_response = {"statusCode": 200, "body": None}
-        if title != "themes":
-            theme = theme_repo.get_by_title(unquote_plus(title))
-            if theme is not None:
-                success_response["body"] = theme.json(related=True)
+        if article_id != "articles":
+            # get a specific article
+            article = article_repo.get_by_id(article_id)
+            if article is not None:
+                success_response["body"] = article.json()
                 return success_response
 
-        # return all themes
-        if sort_field == "top":
-            result = theme_repo.get_top(10)
-        else:
-            result = theme_repo.get_recent(15)
+        result = article_repo.get_last_7days()
         success_response["body"] = "[{}]".format(
-            ",".join([theme.json() for theme in result])
+            ",".join([article.json() for article in result])
         )
         return success_response
     except Exception as error:

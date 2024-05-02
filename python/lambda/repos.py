@@ -3,9 +3,13 @@ import copy
 from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import quote_plus
-from sqlalchemy import create_engine, func
+from psycopg2.errors import UniqueViolation, IntegrityError
+from sqlalchemy import create_engine, desc, func
 from models import Article, Theme, Association, Base, ThemeType
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.orm import sessionmaker, joinedload, selectinload
+import logging
+
+logger = logging.getLogger()
 
 
 class BasePostgresRepository:
@@ -32,7 +36,7 @@ class BasePostgresRepository:
 
     def upsert(self, model):
         existing = self.get_by_title(model._title)
-        if len(existing) > 0:
+        if type(existing) is list and len(existing) > 0:
             return existing[0]
         with closing(self.session()) as session:
             session.add(model)
@@ -62,9 +66,25 @@ class ArticleRepository(BasePostgresRepository):
         super().__init__(username, password, dbname, db_cluster_endpoint)
         self.model = Article
 
+    def get_by_id(self, id):
+        with closing(self.session()) as session:
+            return (
+                session.query(self.model)
+                .options(
+                    joinedload(self.model._themes),
+                )
+                .filter(self.model._id == id)
+                .one()
+            )
+
     def get_by_url(self, url):
         with closing(self.session()) as session:
-            articles = session.query(self.model).filter_by(_url=url).all()
+            articles = (
+                session.query(self.model)
+                .options(joinedload(self.model._themes))
+                .filter_by(_url=url)
+                .all()
+            )
             if len(articles) > 0:
                 detached = session.merge(articles[0])
                 return detached
@@ -113,7 +133,11 @@ class ArticleRepository(BasePostgresRepository):
         with closing(self.session()) as session:
             return (
                 session.query(self.model)
+                .options(
+                    joinedload(self.model._themes),
+                )
                 .filter(self.model._logged_at > datetime.now() - timedelta(days=days))
+                .order_by(self.model._logged_at.desc())
                 .all()
             )
 
@@ -134,33 +158,74 @@ class ThemeRepository(BasePostgresRepository):
             return (
                 session.query(self.model)
                 .filter(self.model._source == ThemeType.TOP)
-                .order_by(self.model._created_at)
+                .order_by(self.model._updated_at.desc())
                 .limit(limit)
             )
 
     def get_top(self, limit: int = 10):
         with closing(self.session()) as session:
-            join_query = session.query(self.model).outerjoin(Association)
+            join_query = session.query(
+                self.model, func.count(Association.article_id)
+            ).join(Association)
             query = join_query.group_by(self.model._id).order_by(
                 func.count(Association.article_id).desc()
             )
-            return query.limit(limit)
+            query = query.limit(limit).with_entities(self.model)
+            logger.info(
+                "query :{}".format(
+                    query.statement.compile(compile_kwargs={"literal_binds": True})
+                )
+            )
+            return query
 
-    def get_by_title(self, title: str):
+    def add(self, model):
+        model = super().add(model)
+        return self.get_by_id(model.id)
+
+    def get_by_id(self, id):
         with closing(self.session()) as session:
             return (
                 session.query(self.model)
-                .options(joinedload(self.model._related))
+                .options(
+                    joinedload(self.model._related),
+                    joinedload(self.model._recurrent),
+                    joinedload(self.model._sporadic),
+                )
+                .filter(self.model._id == id)
+                .one()
+            )
+
+    def get_by_title(self, title: str):
+        with closing(self.session()) as session:
+            themes = (
+                session.query(self.model)
+                .options(
+                    joinedload(self.model._related).selectinload(Article._themes),
+                    joinedload(self.model._recurrent),
+                    joinedload(self.model._sporadic),
+                )
                 .filter(self.model._title == quote_plus(title))
                 .first()
             )
+            return themes[0] if themes is not None and type(themes) is list else themes
 
     def get_by_titles(self, titles: List[str]):
         with closing(self.session()) as session:
             titles = [quote_plus(title) for title in titles]
             return session.query(self.model).filter(self.model._title.in_(titles)).all()
 
-    def add_realted(self, article: Article, theme_titles: List[str]):
+    """
+        Adds a new association between an article and a list of themes.
+
+        Args:
+            article (Article): The article to associate with the themes.
+            theme_titles (List[str]): A list of theme titles to associate with the article.
+
+        Returns:
+            Association: The newly created association.
+    """
+
+    def add_related(self, article: Article, theme_titles: List[str]):
         with closing(self.session()) as session:
             for theme_title in theme_titles:
                 theme = self.get_by_title(theme_title)
@@ -168,7 +233,17 @@ class ThemeRepository(BasePostgresRepository):
                     theme = Theme(theme_title)
                     session.add(theme)
                     session.commit()
-                association = Association(article.id, theme._id)
-                session.add(association)
-                session.commit()
-                return association
+                    association = Association(article.id, theme._id)
+                    duplicate_association = (
+                        session.query(Association)
+                        .filter(
+                            Association.article_id == article.id,
+                            Association.theme_id == theme._id,
+                        )
+                        .first()
+                    )
+                    if duplicate_association is not None:
+                        return duplicate_association
+                    session.add(association)
+                    session.commit()
+                    return association
