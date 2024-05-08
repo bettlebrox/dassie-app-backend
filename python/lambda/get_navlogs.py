@@ -30,7 +30,7 @@ def lambda_handler(event, context):
         items = ddb_table.scan()
         logger.info("DDB Response: {}".format(items))
         if "Items" in items:
-            navlogs = add_presignedurls(items["Items"], bucket_name)
+            navlogs = add_presigned_urls(items["Items"], bucket_name)
             response = {"statusCode": 200, "body": json.dumps(navlogs)}
         else:
             response = {"statusCode": items["HTTPStatusCode"]}
@@ -41,7 +41,7 @@ def lambda_handler(event, context):
         return {"statusCode": 500, "body": {"message": error}}
 
 
-def add_presignedurls(navlogs, bucket_name):
+def add_presigned_urls(navlogs, bucket_name):
     for navlog in navlogs:
         if "image" in navlog:
             image_key = navlog["image"]

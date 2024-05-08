@@ -1,5 +1,7 @@
-# This blueprint
-This blueprint creates a REST API project. The project uses AWS Lambda and Amazon API Gateway with a To Do service reference and deploys it into a chosen AWS account. 
+# Dassie Backend 
+Project was initialized using a AWS Code whisperer template. 
+
+The template created a REST API project that uses AWS Lambda and Amazon API Gateway with a To Do service reference and deploys it into a chosen AWS account. 
 
 # Architecture overview
 
@@ -15,64 +17,9 @@ Both the AWS Cloud Development Kit (CDK) application and AWS Lambda code are wri
 * Java 11
 * Node.js 16 (Typescript)
 
-The build pipeline runs unit and integration tests on the application and produces testing reports. Failed tests will stop the artifacts from publishing.
 
 ![Architecture Diagram](https://deyn4asqcu6xj.cloudfront.net/serverless-todo-backend-arch.png) 
 
-## Connections and permissions
-
-The `"To Do" service` supports the Amazon CodeCatalyst Development Role, which can be created from the [AWS management console Codecatalyst application](https://us-west-2.console.aws.amazon.com/codecatalyst/home?region=us-west-2#/). When clicking “add IAM role”, the first option is to create a CodeCatalyst development role. After clicking create, the role will be automatically added to the Amazon CodeCatalyst space. 
-
-The other option is creating a application specific IAM role, which can be added to the Amazon CodeCatalyst space by selecting "Add an existing IAM role" from the add IAM role options. The IAM role needs to contain the CodeCatalyst trust policy, as well as the following permissions:
-
-## IAM Role
-
-```
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "cloudformation:*",
-                "ssm:*",
-                "s3:*",
-                "iam:PassRole",
-                "iam:GetRole",
-                "iam:CreateRole",
-                "iam:AttachRolePolicy",
-                "iam:PutRolePolicy"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-```
-
-The IAM roles also require the following CodeCatalyst service principals:
-*  codecatalyst.amazonaws.com
-*  codecatalyst-runner.amazonaws.com
-
-## Trust policy:
-
-```
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "",
-            "Effect": "Allow",
-            "Principal": {
-                "Service": [
-                    "codecatalyst.amazonaws.com",
-                    "codecatalyst-runner.amazonaws.com"
-                ]
-            },
-            "Action": "sts:AssumeRole"
-        }
-    ]
-}
-```
 
 # Project resources
 

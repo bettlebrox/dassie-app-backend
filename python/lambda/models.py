@@ -4,12 +4,11 @@ from typing import List
 import uuid
 from sqlalchemy.orm import declarative_base
 import enum
-from sqlalchemy import Column, Enum, ForeignKey, String, DateTime, Boolean
+from sqlalchemy import Column, Enum, ForeignKey, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from urllib.parse import quote_plus, unquote_plus
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
-from typing_extensions import Self
 
 Base = declarative_base()
 

@@ -23,11 +23,6 @@ def lambda_handler(event, context):
             if params is not None and "sortField" in params
             else "top"
         )
-        sort_order = (
-            params["sortOrder"]
-            if params is not None and "sortOrder" in params
-            else "asc"
-        )
         title = event["path"].split("/")[-1]
         logger.debug("Event: {} Context: {}".format(event, context))
         theme_repo = ThemeRepository(

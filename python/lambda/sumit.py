@@ -14,31 +14,27 @@ logger = logging.getLogger("root")
 logger.addHandler(logging.FileHandler("/tmp/sumit.log"))
 logger.setLevel(logging.DEBUG)
 
-DB_CLUSTER_ENDPOINT = "todoappbackendstack-nwbxl-dassie2b404273-65op3qscf7nd.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com"
-DDB_TABLE = "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L"
-BUCKET_NAME = "todoappbackendstack-nwbxl-navlogimages0c68e55c-3ywwdtenerym"
-
 
 def main():
     wandb.init(project="sumit")
-    navlog_service = NavlogService(BUCKET_NAME, DDB_TABLE)
+    navlog_service = NavlogService(os.getenv("BUCKET_NAME"), os.getenv("DDB_TABLE"))
     navlogs = navlog_service.get_content_navlogs()
     secretsmanager = boto3.client("secretsmanager")
     get_secret_value_response = secretsmanager.get_secret_value(
-        SecretId="dassieSecret79403E04-ffZ6841JZBj3"
+        SecretId=os.getenv("DB_SECRET_ARN")
     )
     secret = json.loads(get_secret_value_response["SecretString"])
     article_repo = ArticleRepository(
         secret["username"],
         secret["password"],
         secret["dbname"],
-        DB_CLUSTER_ENDPOINT,
+        os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     theme_repo = ThemeRepository(
         secret["username"],
         secret["password"],
         secret["dbname"],
-        DB_CLUSTER_ENDPOINT,
+        os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
     for navlog in tqdm(navlogs, total=len(navlogs)):

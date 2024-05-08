@@ -19,3 +19,5 @@ python/lambda/debugpy-1.8.1.dist-info
 output
 wandb/
 output.json
+vpn.sh
+local.sh

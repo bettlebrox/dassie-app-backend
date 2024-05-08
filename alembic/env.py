@@ -4,11 +4,13 @@ from sqlalchemy import create_engine
 from sqlalchemy import pool
 import boto3
 import json
+import os
 
-db_url = "postgresql://postgres:{password}@todoappbackendstack-nwbxl-dassie2b404273-65op3qscf7nd.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com/dassie"
+db_endpoint = os.environ["DB_CLUSTER_ENDPOINT"]
+db_url = "postgresql://postgres:{password}@{db_endpoint}/dassie"
 secretsmanager = boto3.client("secretsmanager")
 get_secret_value_response = secretsmanager.get_secret_value(
-    SecretId="dassieSecret79403E04-ffZ6841JZBj3"
+    SecretId=os.getenv("DB_SECRET_ARN")
 )
 secret = json.loads(get_secret_value_response["SecretString"])
 db_url = db_url.format(password=secret["password"])

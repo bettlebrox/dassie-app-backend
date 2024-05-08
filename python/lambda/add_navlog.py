@@ -11,7 +11,6 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 REQUIRED_KEYS = ["title", "type", "tabId", "timestamp", "documentId"]
-BUCKET_NAME = "todoappbackendstack-nwbxl-navlogimages0c68e55c-3ywwdtenerym"
 
 """
 lambda_handler handles the API request to add a new navlog item to DynamoDB.

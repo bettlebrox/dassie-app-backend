@@ -16,17 +16,6 @@ secret = json.loads(get_secret_value_response["SecretString"])
 
 def lambda_handler(event, context):
     try:
-        params = event["queryStringParameters"]
-        sort_field = (
-            params["sortField"]
-            if params is not None and "sortField" in params
-            else "top"
-        )
-        sort_order = (
-            params["sortOrder"]
-            if params is not None and "sortOrder" in params
-            else "asc"
-        )
         article_id = event["path"].split("/")[-1]
         logger.debug("Event: {} Context: {}".format(event, context))
         article_repo = ArticleRepository(

@@ -41,7 +41,7 @@ class NavlogService:
 
         return items
 
-    def _add_presignedurls(self, navlogs):
+    def _add_presigned_urls(self, navlogs):
         for navlog in navlogs:
             if "image" in navlog and navlog["image"] is not None:
                 image_key = navlog["image"]

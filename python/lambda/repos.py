@@ -1,12 +1,10 @@
 from contextlib import closing
-import copy
 from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import quote_plus
-from psycopg2.errors import UniqueViolation, IntegrityError
-from sqlalchemy import create_engine, desc, func
+from sqlalchemy import create_engine, func
 from models import Article, Theme, Association, Base, ThemeType
-from sqlalchemy.orm import sessionmaker, joinedload, selectinload
+from sqlalchemy.orm import sessionmaker, joinedload
 import logging
 
 logger = logging.getLogger()
