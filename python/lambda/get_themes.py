@@ -23,6 +23,7 @@ def lambda_handler(event, context):
             if params is not None and "sortField" in params
             else "top"
         )
+        max = int(params["max"]) if params is not None and "max" in params else 10
         title = event["path"].split("/")[-1]
         logger.debug("Event: {} Context: {}".format(event, context))
         theme_repo = ThemeRepository(
@@ -41,9 +42,9 @@ def lambda_handler(event, context):
 
         # return all themes
         if sort_field == "top":
-            result = theme_repo.get_top(10)
+            result = theme_repo.get_top(max)
         else:
-            result = theme_repo.get_recent(15)
+            result = theme_repo.get_recent(max)
         success_response["body"] = "[{}]".format(
             ",".join([theme.json() for theme in result])
         )

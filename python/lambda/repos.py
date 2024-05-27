@@ -120,12 +120,17 @@ class ArticleRepository(BasePostgresRepository):
 
     def get_by_theme_embedding(self, theme_embedding: List[int]):
         with closing(self.session()) as session:
-            return (
+            query = (
                 session.query(self.model)
-                .order_by(Article._embedding.cosine_distance(theme_embedding))
-                .limit(10)
-                .all()
+                .where((1 - Article._embedding.cosine_distance(theme_embedding)) > 0.8)
+                .order_by(Article._embedding.cosine_distance(theme_embedding).asc())
             )
+            logger.info(
+                "query :{}".format(
+                    query.statement.compile(compile_kwargs={"literal_binds": True})
+                )
+            )
+            return query.limit(20).all()
 
     def get_last_days(self, days=7):
         with closing(self.session()) as session:
@@ -225,6 +230,7 @@ class ThemeRepository(BasePostgresRepository):
 
     def add_related(self, article: Article, theme_titles: List[str]):
         with closing(self.session()) as session:
+            associations = []
             for theme_title in theme_titles:
                 theme = self.get_by_title(theme_title)
                 if theme is None:
@@ -244,4 +250,10 @@ class ThemeRepository(BasePostgresRepository):
                         return duplicate_association
                     session.add(association)
                     session.commit()
-                    return association
+                    associations.append(association)
+                    logger.info(
+                        "Added association between article {} and theme {}".format(
+                            article.id, theme._id
+                        )
+                    )
+            return associations

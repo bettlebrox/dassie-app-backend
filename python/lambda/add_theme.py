@@ -7,7 +7,10 @@ import boto3
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base, Theme
+from models import Base, Theme, ThemeType
+from repos import ArticleRepository, ThemeRepository
+from services.openai_client import OpenAIClient
+from services.themes_service import ThemesService
 
 
 logger = logging.getLogger()
@@ -19,13 +22,6 @@ try:
         SecretId=os.environ["DB_SECRET_ARN"]
     )
     secret = json.loads(get_secret_value_response["SecretString"])
-    # Connect to Aurora
-    engine = create_engine(
-        f"postgresql://{secret['username']}:{secret['password']}@{os.environ['DB_CLUSTER_ENDPOINT']}/{secret['dbname']}",
-        pool_timeout=30,
-    )
-    Session = sessionmaker(bind=engine)
-    Base.metadata.create_all(engine)
 except Exception as error:
     logger.error("Aurora Setup Error: {}".format(error))
 
@@ -33,19 +29,38 @@ except Exception as error:
 def lambda_handler(event, context):
     try:
         logger.info("Event: {} Context: {}".format(event, context))
+        theme_repo = ThemeRepository(
+            secret["username"],
+            secret["password"],
+            secret["dbname"],
+            os.environ["DB_CLUSTER_ENDPOINT"],
+        )
+        article_repo = ArticleRepository(
+            secret["username"],
+            secret["password"],
+            secret["dbname"],
+            os.environ["DB_CLUSTER_ENDPOINT"],
+        )
         try:
             payload = json.loads(event["body"])
             logger.info("Payload: {}".format(payload))
+            title = payload["title"]
         except Exception as error:
             logger.error(
                 "error: {}".format(error.msg if type(error) == ValueError else error)
             )
             return {"statusCode": 400, "body": json.dumps({"message": "Bad Request"})}
-        with closing(Session()) as session:
-            theme = Theme(payload["title"], payload["summary"])
-            session.add(theme)
-            session.commit()
-            return {"statusCode": 201, "body": theme.json()}
+        openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
+        themes_service = ThemesService(theme_repo, article_repo, openai_client)
+        embedding = openai_client.get_embedding(title)
+        related = article_repo.get_by_theme_embedding(embedding)
+        themes = themes_service.build_themes_from_articles(
+            related, ThemeType.CUSTOM, title
+        )
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"themes": [theme.json() for theme in themes]}),
+        }
     except Exception as error:
         logger.error("Error: {}".format(error))
         return {"statusCode": 500, "body": {"message": str(error)}}

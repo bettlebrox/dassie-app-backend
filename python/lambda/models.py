@@ -121,7 +121,10 @@ class Article(Base):
             "logged_at": (
                 "" if self._logged_at is None else self._logged_at.isoformat()
             ),
-            "text": "" if self._text is None else self._text[:200],
+            "updated_at": (
+                "" if self._updated_at is None else self._updated_at.isoformat()
+            ),
+            "text": "" if self._text is None else self._text,
             "source": self._source_navlog,
             "image": self._image,
             "themes": [theme.original_title for theme in self._themes],
@@ -230,6 +233,7 @@ class Theme(Base):
     _created_at = Column(DateTime, default=datetime.now())
     _logged_at = Column(DateTime)
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    _embedding = Column(Vector(1536))
     _related = relationship(
         "Article", secondary="association", order_by=Article._created_at
     )
@@ -251,7 +255,7 @@ class Theme(Base):
         secondaryjoin=Sporadic.related_id == _id,
     )
 
-    def __init__(self, title, summary=None):
+    def __init__(self, title="", summary=None):
         self._title = quote_plus(title)
         self._summary = summary
 
@@ -325,7 +329,12 @@ class Theme(Base):
             "title": self.title,
             "original_title": self.original_title,
             "summary": self.summary,
-            "created_at": self.created_at.isoformat() if self.created_at else "",
+            "created_at": (
+                self.created_at.isoformat() if self.created_at is not None else ""
+            ),
+            "updated_at": (
+                self.updated_at.isoformat() if self.updated_at is not None else ""
+            ),
             "source": self.source.value,
         }
         if related:
@@ -345,3 +354,11 @@ class Theme(Base):
     @logged_at.setter
     def logged_at(self, value):
         self._logged_at = value
+
+    @property
+    def embedding(self):
+        return self._embedding
+
+    @embedding.setter
+    def embedding(self, value):
+        self._embedding = value

@@ -21,3 +21,4 @@ wandb/
 output.json
 vpn.sh
 local.sh
+python/lambda/local.json

@@ -7,13 +7,13 @@ import json
 import os
 
 db_endpoint = os.environ["DB_CLUSTER_ENDPOINT"]
-db_url = "postgresql://postgres:{password}@{db_endpoint}/dassie"
 secretsmanager = boto3.client("secretsmanager")
 get_secret_value_response = secretsmanager.get_secret_value(
     SecretId=os.getenv("DB_SECRET_ARN")
 )
 secret = json.loads(get_secret_value_response["SecretString"])
-db_url = db_url.format(password=secret["password"])
+password = secret["password"]
+db_url = f"postgresql://postgres:{password}@{db_endpoint}/dassie"
 from alembic import context
 
 # this is the Alembic Config object, which provides

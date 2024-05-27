@@ -8,15 +8,18 @@ import boto3
 import json
 import os
 import logging
-import wandb
+import weave
 
+LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 logger = logging.getLogger("root")
-logger.addHandler(logging.FileHandler("/tmp/sumit.log"))
+handler = logging.FileHandler("/tmp/sumit.log")
+handler.setFormatter(logging.Formatter(LOG_FORMAT))
+logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 
 def main():
-    wandb.init(project="sumit")
+    weave.init("sumit")
     navlog_service = NavlogService(os.getenv("BUCKET_NAME"), os.getenv("DDB_TABLE"))
     navlogs = navlog_service.get_content_navlogs()
     secretsmanager = boto3.client("secretsmanager")
@@ -39,13 +42,13 @@ def main():
     openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
     for navlog in tqdm(navlogs, total=len(navlogs)):
         try:
+            body = navlog["body_text"]
+            if len(body) < 100:
+                pass
             article = article_repo.upsert(Article(navlog["title"], "", navlog["url"]))
             if article.summary == "" or article.created_at < datetime.now() - timedelta(
-                days=7
+                days=30
             ):
-                body = navlog["body_text"]
-                if len(body) < 100:
-                    pass
                 article_summary = openai_client.get_article_summarization(
                     navlog["body_text"]
                 )

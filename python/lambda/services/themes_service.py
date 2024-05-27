@@ -12,13 +12,30 @@ class ThemesService:
         self.article_repo = article_repo
         self.openai_client = openai_client
 
-    def build_theme_from_summary(self, theme, summary):
-        theme.summary = summary["summary"]
-        theme_embedding = self.openai_client.get_embedding(theme.title)
-        related_articles = self.article_repo.get_by_theme_embedding(theme_embedding)
+    def build_related_from_title(self, theme):
+        embedding = self.openai_client.get_embedding(theme.title)
+        theme.related = self.article_repo.get_by_theme_embedding(embedding)
+        logger.info(f"Found {len(theme.related)} related articles")
+
+    def build_theme_from_summary(
+        self, summary, theme_type=ThemeType.TOP, given_title=None
+    ):
+        title = summary["title"] if given_title is None else given_title
+        theme = self.theme_repo.get_by_title(title)
+        theme = (
+            Theme(
+                title,
+                summary["summary"],
+            )
+            if theme is None
+            else theme
+        )
+        theme.type = theme_type
+        theme.embedding = self.openai_client.get_embedding(theme.summary)
+        related_articles = self.article_repo.get_by_theme_embedding(theme.embedding)
         logger.info(f"Found {len(related_articles)} related articles")
         theme.related = related_articles
-        theme = self.theme_repo.add(theme)
+        theme = self.theme_repo.upsert(theme)
         logger.info("Added theme: {}".format(theme.id))
         theme.sporadic = self.build_related_themes(theme, summary, False)
         logger.info(f"Sporadic themes {[(t.id,t.title) for t in theme.sporadic]}")
@@ -26,6 +43,7 @@ class ThemesService:
         logger.info(f"Recurrent themes {[(t.id,t.title) for t in theme.recurrent]}")
         self.theme_repo.update(theme)
         logger.info("Updated theme with relations: {}".format(theme.title))
+        return theme
 
     def build_related_themes(self, current_theme, summary, recurrent):
         try:
@@ -54,3 +72,52 @@ class ThemesService:
         except Exception as error:
             logger.error(f"build_related_themes Error: {error}", exc_info=True)
             return []
+
+    def build_themes_from_articles(self, articles, theme_type, given_title=None):
+        logger.info(f"Got {len(articles)} articles")
+        themes = []
+        try:
+            window = []
+            window_size = 0
+            article_window_size = self.openai_client.CONTEXT_WINDOW_SIZE // 8
+            for i, art in enumerate(articles):
+                art_text = art.text
+                article_size = self.openai_client.count_tokens(art_text)
+                if (
+                    self.openai_client.CONTEXT_WINDOW_SIZE - window_size
+                    < article_window_size
+                ):
+                    article_window_size = (
+                        self.openai_client.CONTEXT_WINDOW_SIZE - window_size
+                    )
+                while article_size > article_window_size:
+                    art_text = art_text[: len(art_text) // 2]
+                    article_size = self.openai_client.count_tokens(art_text)
+                    logger.info(
+                        f"window size: {window_size}, target article window size:{article_window_size}. Reducing article size to {len(art_text)} token size {article_size}"
+                    )
+                window.append(art_text)
+                window_size = window_size + article_size
+                if (
+                    window_size
+                    >= self.openai_client.CONTEXT_WINDOW_SIZE
+                    - self.openai_client.CONTEXT_WINDOW_SIZE // 8
+                    or len(articles) == i + 1
+                ):
+                    summary = self.openai_client.get_theme_summarization(window)
+                    if summary is not None:
+                        themes.append(
+                            self.build_theme_from_summary(
+                                summary, theme_type, given_title
+                            )
+                        )
+                    window = []
+                    window_size = 0
+                    article_window_size = self.openai_client.CONTEXT_WINDOW_SIZE // 8
+                else:
+                    logger.info(
+                        f"Window not full, articles processed:{i} window size: {window_size}"
+                    )
+            return themes
+        except Exception as error:
+            logger.error("Error: {}".format(error), exc_info=True)

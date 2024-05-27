@@ -62,7 +62,7 @@ class PythonStack(Stack):
             self,
             "RequirementsLayer",
             entry="python/lambda",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_8],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Requirements layer",
         )
         nr_secret = secretsmanager.Secret.from_secret_complete_arn(
@@ -73,7 +73,7 @@ class PythonStack(Stack):
         getThemes = lambda_.Function(
             self,
             "getThemes",
-            runtime=lambda_.Runtime.PYTHON_3_8,
+            runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_themes.lambda_handler",
             vpc=vpc,
@@ -94,7 +94,7 @@ class PythonStack(Stack):
         getArticles = lambda_.Function(
             self,
             "getArticles",
-            runtime=lambda_.Runtime.PYTHON_3_8,
+            runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_articles.lambda_handler",
             vpc=vpc,
@@ -115,7 +115,7 @@ class PythonStack(Stack):
         addTheme = lambda_.Function(
             self,
             "addTheme",
-            runtime=lambda_.Runtime.PYTHON_3_8,
+            runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
@@ -124,9 +124,10 @@ class PythonStack(Stack):
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
                 "DB_SECRET_ARN": sql_db.secret.secret_arn,
+                "OPENAI_API_KEY": os.environ["OPENAI_API_KEY"],
             },
             tracing=lambda_.Tracing.ACTIVE,
-            timeout=Duration.seconds(25),
+            timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(addTheme)
         sql_db.connections.allow_default_port_from(addTheme)
@@ -147,7 +148,7 @@ class PythonStack(Stack):
         addNavlog = lambda_.Function(
             self,
             "addNavLog",
-            runtime=lambda_.Runtime.PYTHON_3_8,
+            runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.ACTIVE,
