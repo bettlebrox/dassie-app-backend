@@ -42,7 +42,7 @@ def test_get_all_articles():
 def test_get_article_by_id():
     # Create a mock session
     mock_session = MagicMock()
-    mock_session.return_value.query.return_value.get.return_value = Article(
+    mock_session.return_value.query.return_value.options.return_value.filter.return_value.one.return_value = Article(
         title="Test Article",
         summary="This is a test article",
         url="https://example.com",
@@ -143,7 +143,7 @@ def test_get_article_by_url():
     repo.session = mock_session
 
     # Mock the query result
-    mock_query.filter_by.return_value.all.return_value = [
+    mock_query.options.return_value.filter_by.return_value.all.return_value = [
         Article(
             title="Test Article",
             url="https://example.com",
@@ -216,7 +216,7 @@ def test_get_articles_by_theme():
     ]
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
     repo.session = mock_session
-    mock_session.return_value.query.return_value.order_by.return_value.limit.return_value.all.return_value = (
+    mock_session.return_value.query.return_value.where.return_value.order_by.return_value.limit.return_value.all.return_value = (
         articles
     )
     articles = repo.get_by_theme_embedding(query_embedding)
@@ -327,6 +327,10 @@ def test_add_related_theme():
     mock_session.return_value.query.return_value.options.return_value.filter.return_value.first.return_value = [
         theme
     ]
+    mock_session.return_value.query.return_value.filter.return_value.first.return_value = (
+        None
+    )
+
     # Create a new article and theme
     article = Article(
         title="Test Article",
@@ -340,5 +344,5 @@ def test_add_related_theme():
     # Assert that the theme was added and the association was created
     mock_session.return_value.add.assert_called()
     mock_session.return_value.commit.assert_called()
-    assert association.article_id == article._id
-    assert association.theme_id == theme._id
+    assert association[0].article_id == article._id
+    assert association[0].theme_id == theme._id

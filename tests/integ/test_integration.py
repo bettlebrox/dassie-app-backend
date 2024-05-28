@@ -26,6 +26,11 @@ def apiThemeEndpoint() -> str:
     return get_api_endpoint("themes")
 
 
+@pytest.fixture()
+def apiArticleEndpoint() -> str:
+    return get_api_endpoint("articles")
+
+
 """Tests getting all navlogs from the API endpoint.
 
 Verifies the endpoint returns 200 status and the expected response.
@@ -77,6 +82,16 @@ def test_add_theme(apiThemeEndpoint: str):
     ), f"""
         body: {response.data}
         """
+
+
+def test_get_all_articles(apiArticleEndpoint: str):
+    http = urllib3.PoolManager(num_pools=3)
+    response = http.request("GET", apiArticleEndpoint)
+    assert (
+        200 == response.status
+    ), f"""
+    Http status not as expected
+    body: {response.data}"""
 
 
 def test_add_navlog(apiEndpoint: str):

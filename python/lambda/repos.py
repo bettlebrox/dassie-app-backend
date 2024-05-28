@@ -237,23 +237,23 @@ class ThemeRepository(BasePostgresRepository):
                     theme = Theme(theme_title)
                     session.add(theme)
                     session.commit()
-                    association = Association(article.id, theme._id)
-                    duplicate_association = (
-                        session.query(Association)
-                        .filter(
-                            Association.article_id == article.id,
-                            Association.theme_id == theme._id,
-                        )
-                        .first()
+                association = Association(article.id, theme._id)
+                duplicate_association = (
+                    session.query(Association)
+                    .filter(
+                        Association.article_id == article.id,
+                        Association.theme_id == theme._id,
                     )
-                    if duplicate_association is not None:
-                        return duplicate_association
-                    session.add(association)
-                    session.commit()
-                    associations.append(association)
-                    logger.info(
-                        "Added association between article {} and theme {}".format(
-                            article.id, theme._id
-                        )
+                    .first()
+                )
+                if duplicate_association is not None:
+                    return duplicate_association
+                session.add(association)
+                session.commit()
+                associations.append(association)
+                logger.info(
+                    "Added association between article {} and theme {}".format(
+                        article.id, theme._id
                     )
+                )
             return associations

@@ -4,7 +4,7 @@ from typing import List
 import uuid
 from sqlalchemy.orm import declarative_base
 import enum
-from sqlalchemy import Column, Enum, ForeignKey, String, DateTime
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from urllib.parse import quote_plus, unquote_plus
 from sqlalchemy.orm import relationship
@@ -88,6 +88,7 @@ class Article(Base):
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _logged_at = Column(DateTime, index=True)
     _url = Column(String(2000))
+    _tab_id = Column(Integer)
     _text = Column(String)
     _themes = relationship("Theme", secondary="association", back_populates="_related")
     _embedding = Column(Vector(1536))
@@ -97,8 +98,8 @@ class Article(Base):
     def __init__(
         self,
         title: str,
-        summary: str,
         url: str,
+        summary: str = None,
         logged_at: datetime = None,
         text: str = None,
     ):
@@ -210,6 +211,14 @@ class Article(Base):
     @source_navlog.setter
     def source_navlog(self, value):
         self._source_navlog = value
+
+    @property
+    def tab_id(self):
+        return self._tab_id
+
+    @tab_id.setter
+    def tab_id(self, value):
+        self._tab_id = value
 
 
 class ThemeType(enum.Enum):
@@ -335,7 +344,7 @@ class Theme(Base):
             "updated_at": (
                 self.updated_at.isoformat() if self.updated_at is not None else ""
             ),
-            "source": self.source.value,
+            "source": str(self.source.value) if self.source is not None else "",
         }
         if related:
             json_obj["related"] = self.related

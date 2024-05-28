@@ -36,6 +36,7 @@ class ThemesService:
         logger.info(f"Found {len(related_articles)} related articles")
         theme.related = related_articles
         theme = self.theme_repo.upsert(theme)
+        theme = self.theme_repo.get_by_id(theme.id)
         logger.info("Added theme: {}".format(theme.id))
         theme.sporadic = self.build_related_themes(theme, summary, False)
         logger.info(f"Sporadic themes {[(t.id,t.title) for t in theme.sporadic]}")

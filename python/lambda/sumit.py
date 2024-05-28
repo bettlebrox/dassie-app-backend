@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from models import Article
 from repos import ArticleRepository, ThemeRepository
 from services.navlogs_service import NavlogService
+from services.articles_service import ArticlesService
 from services.openai_client import OpenAIClient
 from tqdm.auto import tqdm
 import boto3
@@ -40,32 +41,18 @@ def main():
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
+    article_service = ArticlesService(article_repo, theme_repo, openai_client)
     for navlog in tqdm(navlogs, total=len(navlogs)):
         try:
             body = navlog["body_text"]
-            if len(body) < 100:
+            if len(body) < 100 or "url" not in navlog:
                 pass
-            article = article_repo.upsert(Article(navlog["title"], "", navlog["url"]))
-            if article.summary == "" or article.created_at < datetime.now() - timedelta(
-                days=30
+            article = article_repo.upsert(Article(navlog["title"], navlog["url"]))
+            if article.summary == "" or article.created_at > datetime.now() - timedelta(
+                days=10
             ):
-                article_summary = openai_client.get_article_summarization(
-                    navlog["body_text"]
-                )
-                article.source_navlog = navlog["id"]
-                embedding = openai_client.get_embedding(navlog["body_text"])
-                article.embedding = embedding
-                if article_summary is not None:
-                    article.summary = article_summary["summary"]
-                article.logged_at = datetime.strptime(
-                    navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f"
-                )
-                article.text = navlog["body_text"]
-                if "image" in navlog and navlog["image"] is not None:
-                    article.image = navlog["image"]
-                article = article_repo.update(article)
-                if article_summary is not None:
-                    theme_repo.add_related(article, article_summary["themes"])
+                article_service.build_article(article, navlog)
+                logger.info("Built article {}".format(article.title))
         except Exception as error:
             logger.error(error, exc_info=True)
 
