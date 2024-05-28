@@ -24,7 +24,7 @@ click==8.1.7
 colorama==0.4.6
 constructs==10.3.0
 coverage==6.5.0
-cryptography==41.0.3
+cryptography==42.0.4
 debugpy==1.8.1
 distro==1.9.0
 docker-pycreds==0.4.0
