@@ -29,6 +29,7 @@ def test_build_article():
         "title": "Navlog 1",
         "body_text": "This is a test article body",
         "created_at": "2022-01-01T00:00:00.00",
+        "tabId": "12234",
     }
     article = Article(title="Test Article 1", url="https://example.com")
     article._id = 1

@@ -34,19 +34,17 @@ def init(article_repo=None, theme_repo=None, openai_client=None, themes_service=
             ArticleRepository(*db_params) if article_repo is None else article_repo
         )
         theme_repo = ThemeRepository(*db_params) if theme_repo is None else theme_repo
-        return (
-            article_repo,
-            (
-                openai_client
-                if openai_client is not None
-                else OpenAIClient(os.environ["OPENAI_API_KEY"])
-            ),
-            (
-                themes_service
-                if themes_service is not None
-                else ThemesService(theme_repo, article_repo, openai_client)
-            ),
+        openai_client = (
+            OpenAIClient(os.environ["OPENAI_API_KEY"])
+            if openai_client is None
+            else openai_client
         )
+        themes_service = (
+            ThemesService(theme_repo, article_repo, openai_client)
+            if themes_service is None
+            else themes_service
+        )
+        return (article_repo, openai_client, themes_service)
     except Exception as error:
         logger.error("Aurora Setup Error: {}".format(error))
 
