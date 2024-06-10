@@ -57,11 +57,11 @@ def test_create_theme(setup_database):
 
     # Retrieve the theme from the database
     retrieved_theme = (
-        session.query(Theme).filter_by(_title=quote_plus("Test Theme")).first()
+        session.query(Theme).filter_by(_title=quote_plus("Test Theme".lower())).first()
     )
 
     # Check if the retrieved theme matches the original theme
-    assert retrieved_theme._title == quote_plus("Test Theme")
+    assert retrieved_theme._title == quote_plus("Test Theme").lower()
     assert retrieved_theme._summary == "This is a test theme"
     assert isinstance(retrieved_theme._created_at, datetime)
 
@@ -89,7 +89,7 @@ def test_associate_article_with_theme(setup_database):
     )
 
     # Check if the retrieved theme matches the original theme
-    assert retrieved_article._themes[0]._title == quote_plus("Test Theme")
+    assert retrieved_article._themes[0]._title == quote_plus("Test Theme").lower()
     assert retrieved_article._themes[0]._summary == "This is a test theme"
     assert isinstance(retrieved_article._themes[0]._created_at, datetime)
 

@@ -1,13 +1,9 @@
-from contextlib import closing
 import json
 import os
 import logging
 import boto3
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from models import Base, Theme, ThemeType
+from models import ThemeType
 from repos import ArticleRepository, ThemeRepository
 from services.openai_client import OpenAIClient
 from services.themes_service import ThemesService
@@ -73,13 +69,15 @@ def lambda_handler(
             return {"statusCode": 400, "body": json.dumps({"message": "Bad Request"})}
         embedding = openai_client.get_embedding(title)
         related = article_repo.get_by_theme_embedding(embedding)
-        themes = themes_service.build_themes_from_articles(
-            related, ThemeType.CUSTOM, title
+        themes = themes_service.build_themes_from_related_articles(
+            related, ThemeType.CUSTOM, title, embedding
         )
         return {
             "statusCode": 201,
-            "body": json.dumps({"themes": [theme.json() for theme in themes]}),
+            "body": '{{"themes": [{}]}}'.format(
+                ",".join(theme.json() for theme in themes)
+            ),
         }
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)
-        return {"statusCode": 500, "body": {"message": str(error)}}
+        return {"statusCode": 500, "body": json.dumps({"message": str(error)})}

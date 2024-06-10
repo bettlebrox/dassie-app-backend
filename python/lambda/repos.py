@@ -125,7 +125,7 @@ class ArticleRepository(BasePostgresRepository):
                 .where((1 - Article._embedding.cosine_distance(theme_embedding)) > 0.8)
                 .order_by(Article._embedding.cosine_distance(theme_embedding).asc())
             )
-            logger.info(
+            logger.debug(
                 "query :{}".format(
                     query.statement.compile(compile_kwargs={"literal_binds": True})
                 )
@@ -156,20 +156,33 @@ class ThemeRepository(BasePostgresRepository):
     def get_all(self):
         return super().get_all()
 
-    def get_recent(self, limit: int = 10):
+    def get_recent(self, limit: int = 10, source: ThemeType = ThemeType.TOP):
         with closing(self.session()) as session:
-            return (
-                session.query(self.model)
-                .filter(self.model._source == ThemeType.TOP)
-                .order_by(self.model._updated_at.desc())
-                .limit(limit)
+            query = session.query(self.model)
+            query = (
+                query.filter(self.model._source == source)
+                if source is not None
+                else query
             )
+            return query.order_by(self.model._updated_at.desc()).limit(limit)
 
-    def get_top(self, limit: int = 10):
+    def get_top(self, limit: int = 10, source: ThemeType = None, days: int = 0):
         with closing(self.session()) as session:
             join_query = session.query(
                 self.model, func.count(Association.article_id)
             ).join(Association)
+            join_query = (
+                join_query
+                if source is None
+                else join_query.filter(self.model._source == source)
+            )
+            join_query = (
+                join_query
+                if days == 0
+                else join_query.filter(
+                    Association.created_at > datetime.now() - timedelta(days=days)
+                )
+            )
             query = join_query.group_by(self.model._id).order_by(
                 func.count(Association.article_id).desc()
             )
@@ -207,7 +220,7 @@ class ThemeRepository(BasePostgresRepository):
                     joinedload(self.model._recurrent),
                     joinedload(self.model._sporadic),
                 )
-                .filter(self.model._title == quote_plus(title))
+                .filter(self.model._title == quote_plus(title).lower())
                 .first()
             )
             return themes[0] if themes is not None and type(themes) is list else themes

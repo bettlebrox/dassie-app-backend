@@ -2,11 +2,18 @@ from openai import OpenAI
 import logging
 import json
 import tiktoken
-import weave
-from datetime import datetime
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+
+class LLMResponseException(Exception):
+    """
+    Represents an exception that occurs when there is an issue with the response from the OpenAI language model.
+    """
+
+    def __init__(self, message):
+        self.message = message
 
 
 class OpenAIClient:
@@ -35,7 +42,6 @@ class OpenAIClient:
     def __init__(self, api_key):
         self.openai_client = OpenAI(api_key=api_key)
 
-    @weave.op()
     def get_embedding(self, article, model="text-embedding-ada-002"):
         article = article.replace("\n", " ")
         try:
@@ -49,7 +55,6 @@ class OpenAIClient:
             logger.error(f"get_embeddings Error: {error}")
             return None
 
-    @weave.op()
     def get_completion(self, prompt, query, model=MODEL):
         if len(query) < 100:
             logger.info(f"query too short: {len(query)}")
@@ -77,9 +82,12 @@ class OpenAIClient:
                 )
                 response = error
             return json.loads(response.choices[0].message.content)
+        except json.JSONDecodeError as error:
+            logger.error(f"get_completion JSON decoding Error: {error}", exc_info=True)
+            raise LLMResponseException(error)
         except Exception as error:
             logger.error(f"get_completion Error: {error}", exc_info=True)
-            return None
+        return None
 
     def get_article_summarization(self, article):
         if len(article) < 100:

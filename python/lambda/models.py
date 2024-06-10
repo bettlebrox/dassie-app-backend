@@ -89,6 +89,9 @@ class Article(Base):
     _logged_at = Column(DateTime, index=True)
     _url = Column(String(2000))
     _tab_id = Column(Integer)
+    _document_id = Column(String)
+    _parent_document_id = Column(String)
+    _token_count = Column(Integer)
     _text = Column(String)
     _themes = relationship("Theme", secondary="association", back_populates="_related")
     _embedding = Column(Vector(1536))
@@ -220,6 +223,38 @@ class Article(Base):
     def tab_id(self, value):
         self._tab_id = value
 
+    @property
+    def token_count(self):
+        return self._token_count
+
+    @token_count.setter
+    def token_count(self, value):
+        self._token_count = value
+
+    @property
+    def parent_document_id(self):
+        return self._parent_document_id
+
+    @parent_document_id.setter
+    def parent_document_id(self, value):
+        self._parent_document_id = value
+
+    @property
+    def document_id(self):
+        return self._document_id
+
+    @document_id.setter
+    def document_id(self, value):
+        self._document_id = value
+
+    @property
+    def updated_at(self):
+        return self._updated_at
+
+    @updated_at.setter
+    def updated_at(self, value):
+        self._updated_at = value
+
 
 class ThemeType(enum.Enum):
     SEARCH_TERM = "search_term"
@@ -240,7 +275,6 @@ class Theme(Base):
     _title = Column(String)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
-    _logged_at = Column(DateTime)
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _embedding = Column(Vector(1536))
     _related = relationship(
@@ -265,7 +299,7 @@ class Theme(Base):
     )
 
     def __init__(self, title="", summary=None):
-        self._title = quote_plus(title)
+        self._title = quote_plus(title.lower())
         self._summary = summary
 
     @property
@@ -330,7 +364,7 @@ class Theme(Base):
 
     @property
     def original_title(self):
-        return unquote_plus(self._title)
+        return unquote_plus(self._title).title()
 
     def json(self, related=False, dump=True):
         json_obj = {
@@ -351,18 +385,6 @@ class Theme(Base):
             json_obj["recurrent"] = self.recurrent
             json_obj["sporadic"] = self.sporadic
         return json.dumps(json_obj, cls=JsonFunctionEncoder) if dump else json_obj
-
-    @property
-    def original_title(self):
-        return unquote_plus(self._title)
-
-    @property
-    def logged_at(self):
-        return self._logged_at
-
-    @logged_at.setter
-    def logged_at(self, value):
-        self._logged_at = value
 
     @property
     def embedding(self):

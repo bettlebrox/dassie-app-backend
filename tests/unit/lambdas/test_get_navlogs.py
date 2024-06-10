@@ -6,9 +6,8 @@ Description: Runs a test for our 'get_navlogs' Lambda
 import os
 import sys
 import boto3
-import json
 import pytest
-from moto import mock_dynamodb
+from moto import mock_aws
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda")
@@ -39,7 +38,7 @@ def test_initialization(aws_credentials):
     assert payload["statusCode"] == 500
 
 
-@mock_dynamodb
+@mock_aws
 def test_valid_request(aws_credentials):
     event = {}
     context = None
@@ -51,7 +50,7 @@ def test_valid_request(aws_credentials):
     assert payload["statusCode"] == 200
 
 
-@mock_dynamodb
+@mock_aws
 def create_mock_ddb_table():
     mock_ddb = boto3.resource("dynamodb")
     mock_ddb.create_table(

@@ -4,16 +4,10 @@ Description: Runs a test for our 'add_todo' Lambda
 """
 
 import os
-import sys
 import boto3
 import json
 import pytest
-from moto import mock_dynamodb
-
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda")
-)
-
+from moto import mock_aws
 from add_navlog import lambda_handler
 
 
@@ -48,7 +42,7 @@ def test_empty_event(aws_credentials):
     assert payload["statusCode"] == 400
 
 
-@mock_dynamodb
+@mock_aws
 def test_missing_title(aws_credentials):
     event = {"body": '{ "not_title": "test" }'}
     context = None
@@ -63,7 +57,7 @@ def test_missing_title(aws_credentials):
     )
 
 
-@mock_dynamodb
+@mock_aws
 def test_valid_navlog_request(aws_credentials):
     event = {
         "body": '{"type":"content","title":"New Tab","tabId":"529522941","body_text":"some text","body_inner_html":"\\"\\"<script aria-hidden=\\"true\\" nonce=\\"\\">window.wiz_progress&&window.wiz_progress(); ", "timestamp":"1710432439145.628","documentId":"BCD99AE78F0EAA0A1D1B4BE9D1AE9825","url":"chrome://new-tab-page/","transitionType":"typed"}'
@@ -81,7 +75,7 @@ def test_valid_navlog_request(aws_credentials):
     assert json_payload_body["body_text"] == json_event_body["body_text"]
 
 
-@mock_dynamodb
+@mock_aws
 def test_valid_navlog_nobodyhtml_request(aws_credentials):
     event = {
         "body": '{"type":"navigation","title":"New Tab","tabId":"529522941", "timestamp":"1710432439145.628","documentId":"BCD99AE78F0EAA0A1D1B4BE9D1AE9825","url":"chrome://new-tab-page/","transitionType":"typed"}'
@@ -93,7 +87,7 @@ def test_valid_navlog_nobodyhtml_request(aws_credentials):
     assert payload["statusCode"] == 201
 
 
-@mock_dynamodb
+@mock_aws
 def create_mock_ddb_table():
     mock_ddb = boto3.resource("dynamodb")
     mock_ddb.create_table(

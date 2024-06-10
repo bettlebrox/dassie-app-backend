@@ -33,7 +33,6 @@ class PythonStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
         vpc = ec2.Vpc(self, "AuroraVpc")
-        # Create a new secret to store the master username and password for the Aurora Serverless cluster
         sql_db = rds.ServerlessCluster(
             self,
             "dassie",
@@ -61,7 +60,7 @@ class PythonStack(Stack):
         reqs_layer = lambda_python.PythonLayerVersion(
             self,
             "RequirementsLayer",
-            entry="python/lambda",
+            entry="python/layer",
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Requirements layer",
         )

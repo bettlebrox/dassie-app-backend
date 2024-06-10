@@ -62,13 +62,10 @@ def test_get_all_themes(apiThemeEndpoint: str):
 def test_add_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     global random_title
-    random_title = "Integration Testing {}".format(uuid4().hex)
+    random_title = "the meaning of life, the universe and everything"
     theme = json.dumps(
         {
-            "id": str(uuid4()),
             "title": random_title,
-            "summary": "some summary of {}".format(random_title),
-            "url": "https://bob.com",
         }
     )
     response = http.request(
@@ -82,6 +79,33 @@ def test_add_theme(apiThemeEndpoint: str):
     ), f"""
         body: {response.data}
         """
+
+
+def test_add_ontheme_theme(apiThemeEndpoint: str):
+    http = urllib3.PoolManager(num_pools=3)
+    global random_title
+    random_title = "aws cdk and its use in python"
+    theme = json.dumps(
+        {
+            "id": str(uuid4()),
+            "title": random_title,
+        }
+    )
+    response = http.request(
+        "POST",
+        apiThemeEndpoint,
+        headers={"Content-Type": "application/json"},
+        body=theme,
+    )
+    assert (
+        response.status == 201
+    ), f"""
+        body: {response.data}
+        """
+    assert (
+        json.loads(response.data.decode("utf-8"))["themes"][0]["original_title"]
+        == random_title
+    )
 
 
 def test_get_all_articles(apiArticleEndpoint: str):

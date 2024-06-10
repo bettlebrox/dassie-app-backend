@@ -12,11 +12,11 @@ import logging
 import weave
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-logger = logging.getLogger("root")
+logger = logging.getLogger()
 handler = logging.FileHandler("/tmp/sumit.log")
 handler.setFormatter(logging.Formatter(LOG_FORMAT))
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def main():
@@ -46,8 +46,15 @@ def main():
         try:
             body = navlog["body_text"]
             if len(body) < 100 or "url" not in navlog:
-                pass
-            article = article_repo.upsert(Article(navlog["title"], navlog["url"]))
+                continue
+            article = article_repo.upsert(
+                Article(
+                    navlog["title"],
+                    navlog["url"],
+                    text=body,
+                    logged_at=navlog["created_at"],
+                )
+            )
             if article.summary == "" or article.created_at > datetime.now() - timedelta(
                 days=10
             ):
