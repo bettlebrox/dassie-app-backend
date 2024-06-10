@@ -14,6 +14,7 @@ test_id = ""
 random_title = ""
 LOCAL_API = "http://127.0.0.1:3000/api"
 PRD_API = "https://p5cgnlejzk.execute-api.eu-west-1.amazonaws.com/prod"
+GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.fixture()
@@ -37,6 +38,7 @@ Verifies the endpoint returns 200 status and the expected response.
 """
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_get_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     # Testing getting all todos
@@ -48,6 +50,7 @@ def test_get_theme(apiThemeEndpoint: str):
     body: {response.data}"""
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_get_all_themes(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     # Testing getting all todos
@@ -59,6 +62,7 @@ def test_get_all_themes(apiThemeEndpoint: str):
     body: {response.data}"""
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_add_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     global random_title
@@ -81,6 +85,7 @@ def test_add_theme(apiThemeEndpoint: str):
         """
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_add_ontheme_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     global random_title
@@ -108,6 +113,7 @@ def test_add_ontheme_theme(apiThemeEndpoint: str):
     )
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_get_all_articles(apiArticleEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     response = http.request("GET", apiArticleEndpoint)
@@ -118,6 +124,7 @@ def test_get_all_articles(apiArticleEndpoint: str):
     body: {response.data}"""
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_add_navlog(apiEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     global random_title
@@ -146,6 +153,7 @@ def test_add_navlog(apiEndpoint: str):
         """
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def get_api_endpoint(resourcename="navlogs"):
     apiEndpoint = LOCAL_API  # PRD_API  # LOCAL_API
     if apiEndpoint.startswith("http://127.0.0.1"):
