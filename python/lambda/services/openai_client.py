@@ -45,7 +45,7 @@ class OpenAIClient:
     def get_embedding(self, article, model="text-embedding-ada-002"):
         article = article.replace("\n", " ")
         try:
-            logger.info(f"get_embeddings: {article}")
+            logger.debug(f"get_embeddings: {article}")
             response = self.openai_client.embeddings.create(
                 input=[article],
                 model=model,
