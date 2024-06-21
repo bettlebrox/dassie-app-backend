@@ -32,7 +32,7 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
-        vpc = ec2.Vpc(self, "AuroraVpc")
+        vpc = ec2.Vpc(self, "AuroraVpc1")
         sql_db = rds.ServerlessCluster(
             self,
             "dassie",

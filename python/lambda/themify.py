@@ -1,6 +1,6 @@
 from models import ThemeType
 from repos import ArticleRepository, ThemeRepository
-from services.openai_client import OpenAIClient
+from services.openai_client import LLMResponseException, OpenAIClient
 import boto3
 import json
 import os
@@ -35,7 +35,7 @@ def main():
     )
     openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
-    top_themes = theme_repo.get_top(10, days=1)
+    top_themes = theme_repo.get_top(100)
     for theme in top_themes:
         embedding = (
             theme.embedding
@@ -43,7 +43,10 @@ def main():
             else openai_client.get_embedding(theme.original_title)
         )
         articles = article_repo.get_by_theme_embedding(embedding)
-        themes_service.build_themes_from_related_articles(articles, ThemeType.TOP)
+        try:
+            themes_service.build_themes_from_related_articles(articles, ThemeType.TOP)
+        except LLMResponseException as e:
+            logger.error(f"Failed to build themes from related articles: {e}")
 
 
 if __name__ == "__main__":

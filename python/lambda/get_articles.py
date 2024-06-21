@@ -37,6 +37,7 @@ def lambda_handler(event, context):
         success_response["body"] = "[{}]".format(
             ",".join([article.json() for article in result])
         )
+        success_response["headers"] = {"Access-Control-Allow-Origin": "*"}
         return success_response
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)

@@ -14,11 +14,11 @@ class BasePostgresRepository:
     def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
         engine = create_engine(
             f"postgresql://{username}:{password}@{db_cluster_endpoint}/{dbname}",
-            pool_timeout=30,
+            pool_timeout=10,
         )
         self.session = sessionmaker(bind=engine, expire_on_commit=False)
         self._logger = logger
-        # Base.metadata.create_all(engine)
+        Base.metadata.create_all(engine)
 
     def get_all(self):
         with closing(self.session()) as session:

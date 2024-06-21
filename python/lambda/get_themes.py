@@ -59,10 +59,19 @@ def lambda_handler(event, context, theme_repo=None):
         success_response["body"] = "[{}]".format(
             ",".join([theme.json() for theme in result])
         )
+        success_response["headers"] = {"Access-Control-Allow-Origin": "*"}
         return success_response
     except ValueError as error:
         logger.error("ValueError: {}".format(error))
-        return {"statusCode": 400, "body": {"message": str(error)}}
+        return {
+            "statusCode": 400,
+            "body": {"message": str(error)},
+            "headers": {"Access-Control-Allow-Origin": "*"},
+        }
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)
-        return {"statusCode": 500, "body": {"message": str(error)}}
+        return {
+            "statusCode": 500,
+            "body": {"message": str(error)},
+            "headers": {"Access-Control-Allow-Origin": "*"},
+        }

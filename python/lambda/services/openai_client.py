@@ -82,7 +82,7 @@ class OpenAIClient:
                 )
                 response = error
             return json.loads(response.choices[0].message.content)
-        except json.JSONDecodeError as error:
+        except json.decoder.JSONDecodeError as error:
             logger.error(f"get_completion JSON decoding Error: {error}", exc_info=True)
             raise LLMResponseException(error)
         except Exception as error:
