@@ -55,6 +55,7 @@ def lambda_handler(
 ):
     try:
         logger.info("Event: {} Context: {}".format(event, context))
+        response = {"statusCode": 201, "headers": {"Access-Control-Allow-Origin": "*"}}
         article_repo, openai_client, themes_service = init(
             article_repo, theme_repo, openai_client, themes_service
         )
@@ -66,18 +67,20 @@ def lambda_handler(
             logger.error(
                 "error: {}".format(error.msg if type(error) == ValueError else error)
             )
-            return {"statusCode": 400, "body": json.dumps({"message": "Bad Request"})}
+            response["body"] = json.dumps({"message": "Bad Request"})
+            response["statusCode"] = 400
+            return response
         embedding = openai_client.get_embedding(title)
         related = article_repo.get_by_theme_embedding(embedding)
         themes = themes_service.build_themes_from_related_articles(
             related, ThemeType.CUSTOM, title, embedding
         )
-        return {
-            "statusCode": 201,
-            "body": '{{"themes": [{}]}}'.format(
-                ",".join(theme.json() for theme in themes)
-            ),
-        }
+        response["body"] = '{{"themes": [{}]}}'.format(
+            ",".join(theme.json() for theme in themes)
+        )
+        return response
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)
-        return {"statusCode": 500, "body": json.dumps({"message": str(error)})}
+        response["statusCode"] = 500
+        response["body"] = json.dumps({"message": str(error)})
+        return response

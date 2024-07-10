@@ -27,6 +27,7 @@ def init():
 
 def lambda_handler(event, context, theme_repo=None):
     logger.debug("Event: {} Context: {}".format(event, context))
+    response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         theme_repo = init() if theme_repo is None else theme_repo
         sort_field = "updated_at"
@@ -42,12 +43,12 @@ def lambda_handler(event, context, theme_repo=None):
         result = []
         max = int(params["max"]) if "max" in params else "max"
         title = event["path"].split("/")[-1]
-        success_response = {"statusCode": 200, "body": None}
+        response["body"] = None
         if title != "themes":
             theme = theme_repo.get_by_title(unquote_plus(title))
             if theme is not None:
-                success_response["body"] = theme.json(related=True)
-                return success_response
+                response["body"] = theme.json(related=True)
+                return response
 
         # return all themes
         if sort_field == "count_association":
@@ -56,22 +57,13 @@ def lambda_handler(event, context, theme_repo=None):
             result = theme_repo.get_recent(max, source)
         else:
             raise ValueError("Invalid sort field: {}".format(sort_field))
-        success_response["body"] = "[{}]".format(
-            ",".join([theme.json() for theme in result])
-        )
-        success_response["headers"] = {"Access-Control-Allow-Origin": "*"}
-        return success_response
+        response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))
     except ValueError as error:
         logger.error("ValueError: {}".format(error))
-        return {
-            "statusCode": 400,
-            "body": {"message": str(error)},
-            "headers": {"Access-Control-Allow-Origin": "*"},
-        }
+        response["statusCode"] = 400
+        response["body"] = {"message": str(error)}
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)
-        return {
-            "statusCode": 500,
-            "body": {"message": str(error)},
-            "headers": {"Access-Control-Allow-Origin": "*"},
-        }
+        response["statusCode"] = 500
+        response["body"] = {"message": str(error)}
+    return response

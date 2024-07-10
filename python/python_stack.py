@@ -176,33 +176,39 @@ class PythonStack(Stack):
             conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
             principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
         )
+        cors = apigateway.CorsOptions(
+            allow_credentials=True,
+            allow_origins=["http://localhost:5173"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
         apiGateway = apigateway.RestApi(
             self,
             "ApiGateway",
             policy=iam.PolicyDocument(statements=[policy]),
-            default_cors_preflight_options=apigateway.CorsOptions(
-                allow_credentials=True,
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "PUT", "OPTIONS"],
-                allow_headers=[
-                    "Content-Type",
-                    "Authorization",
-                    "Content-Length",
-                    "X-Requested-With",
-                ],
-            ),
+            default_cors_preflight_options=cors,
             deploy_options=apigateway.StageOptions(
                 access_log_destination=apigateway.LogGroupLogDestination(log_group),
-                access_log_format=apigateway.AccessLogFormat.json_with_standard_fields(
-                    caller=True,
-                    http_method=True,
-                    ip=True,
-                    protocol=True,
-                    request_time=True,
-                    resource_path=True,
-                    response_length=True,
-                    status=True,
-                    user=True,
+                access_log_format=apigateway.AccessLogFormat.custom(
+                    json.dumps(
+                        {
+                            "request_id": apigateway.AccessLogField.context_request_id(),
+                            "source_ip": apigateway.AccessLogField.context_identity_source_ip(),
+                            "caller": apigateway.AccessLogField.context_identity_caller(),
+                            "cognito_id_pool": apigateway.AccessLogField.context_identity_cognito_identity_pool_id(),
+                            "method": apigateway.AccessLogField.context_http_method(),
+                            "path": apigateway.AccessLogField.context_path(),
+                            "status": apigateway.AccessLogField.context_status(),
+                            "user_context": {
+                                "sub": apigateway.AccessLogField.context_authorizer_claims(
+                                    "sub"
+                                ),
+                                "email": apigateway.AccessLogField.context_authorizer_claims(
+                                    "email"
+                                ),
+                            },
+                        }
+                    )
                 ),
             ),
         )
@@ -224,17 +230,7 @@ class PythonStack(Stack):
         api = apiGateway.root.add_resource("api")
         todos = api.add_resource(
             "navlogs",
-            default_cors_preflight_options=apigateway.CorsOptions(
-                allow_credentials=True,
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["POST", "PUT", "DELETE", "OPTIONS"],
-                allow_headers=[
-                    "Content-Type",
-                    "Authorization",
-                    "Content-Length",
-                    "X-Requested-With",
-                ],
-            ),
+            default_cors_preflight_options=cors,
         )
         todos.add_method(
             "POST",
@@ -243,17 +239,7 @@ class PythonStack(Stack):
         )
         articles = api.add_resource(
             "articles",
-            default_cors_preflight_options=apigateway.CorsOptions(
-                allow_credentials=True,
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "POST", "OPTIONS"],
-                allow_headers=[
-                    "Content-Type",
-                    "Authorization",
-                    "Content-Length",
-                    "X-Requested-With",
-                ],
-            ),
+            default_cors_preflight_options=cors,
         )
         articles.add_method(
             "GET",
@@ -263,17 +249,7 @@ class PythonStack(Stack):
 
         themes = api.add_resource(
             "themes",
-            default_cors_preflight_options=apigateway.CorsOptions(
-                allow_credentials=True,
-                allow_origins=apigateway.Cors.ALL_ORIGINS,
-                allow_methods=["GET", "POST", "OPTIONS"],
-                allow_headers=[
-                    "Content-Type",
-                    "Authorization",
-                    "Content-Length",
-                    "X-Requested-With",
-                ],
-            ),
+            default_cors_preflight_options=cors,
         )
         themes.add_method(
             "GET",

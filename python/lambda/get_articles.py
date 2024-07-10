@@ -15,6 +15,7 @@ secret = json.loads(get_secret_value_response["SecretString"])
 
 
 def lambda_handler(event, context):
+    response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         article_id = event["path"].split("/")[-1]
         logger.debug("Event: {} Context: {}".format(event, context))
@@ -25,20 +26,19 @@ def lambda_handler(event, context):
             os.environ["DB_CLUSTER_ENDPOINT"],
         )
         result = []
-        success_response = {"statusCode": 200, "body": None}
+        response["body"] = None
         if article_id != "articles":
             # get a specific article
             article = article_repo.get_by_id(article_id)
             if article is not None:
-                success_response["body"] = article.json()
-                return success_response
-
+                response["body"] = article.json()
+                return response
         result = article_repo.get_last_7days()
-        success_response["body"] = "[{}]".format(
+        response["body"] = "[{}]".format(
             ",".join([article.json() for article in result])
         )
-        success_response["headers"] = {"Access-Control-Allow-Origin": "*"}
-        return success_response
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)
-        return {"statusCode": 500, "body": {"message": str(error)}}
+        response["body"] = {"message": str(error)}
+        response["statusCode"] = 500
+    return response

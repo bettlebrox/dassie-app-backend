@@ -155,7 +155,7 @@ def test_add_navlog(apiEndpoint: str):
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def get_api_endpoint(resourcename="navlogs"):
-    apiEndpoint = LOCAL_API  # PRD_API  # LOCAL_API
+    apiEndpoint = PRD_API  # LOCAL_API
     if apiEndpoint.startswith("http://127.0.0.1"):
         warnings.warn(
             "Using local API endpoint for testing. Ensure sam local start-api is running before running tests."
