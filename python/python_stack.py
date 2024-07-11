@@ -132,6 +132,27 @@ class PythonStack(Stack):
         sql_db.connections.allow_default_port_from(addTheme)
         sql_db.secret.grant_read(addTheme)
         nr_secret.grant_read(addTheme)
+
+        delTheme = lambda_.Function(
+            self,
+            "delTheme",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            handler="del_theme.lambda_handler",
+            vpc=vpc,
+            layers=[reqs_layer],
+            security_groups=sql_db.connections.security_groups,
+            environment={
+                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
+                "DB_SECRET_ARN": sql_db.secret.secret_arn,
+            },
+            tracing=lambda_.Tracing.ACTIVE,
+            timeout=Duration.seconds(45),
+        )
+        sql_db.grant_data_api_access(delTheme)
+        sql_db.connections.allow_default_port_from(delTheme)
+        sql_db.secret.grant_read(delTheme)
+        nr_secret.grant_read(delTheme)
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
             security_group.add_ingress_rule(
@@ -266,6 +287,11 @@ class PythonStack(Stack):
         themes_sub.add_method(
             "GET",
             apigateway.LambdaIntegration(getThemes),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+        themes_sub.add_method(
+            "DELETE",
+            apigateway.LambdaIntegration(delTheme),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 

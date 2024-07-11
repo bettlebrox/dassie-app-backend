@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import List
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine, func
-from models import Article, Theme, Association, Base, ThemeType
+from models import Article, Recurrent, Sporadic, Theme, Association, Base, ThemeType
 from sqlalchemy.orm import sessionmaker, joinedload
 import logging
 
@@ -270,3 +270,13 @@ class ThemeRepository(BasePostgresRepository):
                     )
                 )
             return associations
+
+    def delete(self, model):
+        with closing(self.session()) as session:
+            session.query(Association).filter(Association.theme_id == model.id).delete()
+            session.query(Sporadic).filter(Sporadic.theme_id == model.id).delete()
+            session.query(Sporadic).filter(Sporadic.related_id == model.id).delete()
+            session.query(Recurrent).filter(Recurrent.theme_id == model.id).delete()
+            session.query(Recurrent).filter(Recurrent.related_id == model.id).delete()
+            session.delete(model)
+            session.commit()

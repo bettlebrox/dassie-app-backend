@@ -1,4 +1,5 @@
 from random import random
+from urllib.parse import quote_plus, urlencode
 from uuid import uuid4
 import boto3
 import json
@@ -86,7 +87,36 @@ def test_add_theme(apiThemeEndpoint: str):
 
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
-def test_add_ontheme_theme(apiThemeEndpoint: str):
+def test_del_theme(apiThemeEndpoint: str):
+    http = urllib3.PoolManager(num_pools=3)
+    global random_title
+    random_title = "consumer information and news"
+    theme = json.dumps(
+        {
+            "title": random_title,
+        }
+    )
+    response = http.request(
+        "POST",
+        apiThemeEndpoint,
+        headers={"Content-Type": "application/json"},
+        body=theme,
+    )
+    assert (
+        response.status == 201
+    ), f"""
+        body: {response.data}
+        """
+    response = http.request("DELETE", apiThemeEndpoint + "/" + quote_plus(random_title))
+    assert (
+        200 == response.status
+    ), f"""
+        body: {response.data}
+        """
+
+
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
+def test_add_one_theme(apiThemeEndpoint: str):
     http = urllib3.PoolManager(num_pools=3)
     global random_title
     random_title = "aws cdk and its use in python"
@@ -108,7 +138,7 @@ def test_add_ontheme_theme(apiThemeEndpoint: str):
         body: {response.data}
         """
     assert (
-        json.loads(response.data.decode("utf-8"))["themes"][0]["original_title"]
+        json.loads(response.data.decode("utf-8"))["themes"][0]["original_title"].lower()
         == random_title
     )
 
@@ -155,7 +185,7 @@ def test_add_navlog(apiEndpoint: str):
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def get_api_endpoint(resourcename="navlogs"):
-    apiEndpoint = PRD_API  # LOCAL_API
+    apiEndpoint = LOCAL_API  # PRD_API  # LOCAL_API
     if apiEndpoint.startswith("http://127.0.0.1"):
         warnings.warn(
             "Using local API endpoint for testing. Ensure sam local start-api is running before running tests."
