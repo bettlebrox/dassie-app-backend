@@ -41,7 +41,7 @@ def lambda_handler(event, context):
         title = event["path"].split("/")[-1]
         response["body"] = None
         if title != "themes":
-            theme = theme_repo.get_by_title(unquote_plus(title))
+            theme = theme_repo.get_by_title(title.lower())
             if theme is not None:
                 response["body"] = theme.json(related=True)
                 return response

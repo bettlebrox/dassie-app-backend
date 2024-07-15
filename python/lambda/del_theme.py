@@ -28,7 +28,7 @@ def lambda_handler(event, context):
     try:
         title = event["path"].split("/")[-1]
         if title != "themes":
-            theme = theme_repo.get_by_title(unquote_plus(title))
+            theme = theme_repo.get_by_title(title.lower())
             if theme is None:
                 response["statusCode"] = 404
                 response["body"] = {"message": "Theme not found"}

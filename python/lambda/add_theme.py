@@ -26,12 +26,16 @@ def init(article_repo=None, theme_repo=None, openai_client=None, themes_service=
             secret["dbname"],
             os.environ["DB_CLUSTER_ENDPOINT"],
         )
+        get_secret_value_response = secretsmanager.get_secret_value(
+            SecretId=os.environ["OPENAIKEY_SECRET_ARN"]
+        )
+        openaikey_secret = json.loads(get_secret_value_response["SecretString"])
         article_repo = (
             ArticleRepository(*db_params) if article_repo is None else article_repo
         )
         theme_repo = ThemeRepository(*db_params) if theme_repo is None else theme_repo
         openai_client = (
-            OpenAIClient(os.environ["OPENAI_API_KEY"])
+            OpenAIClient(openaikey_secret["OPENAI_API_KEY"])
             if openai_client is None
             else openai_client
         )

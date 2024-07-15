@@ -69,6 +69,11 @@ class PythonStack(Stack):
             "nr_license_key",
             secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:NEW_RELIC_LICENSE_KEY-vZyhkl",
         )
+        openai_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "openai_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
+        )
         getThemes = lambda_.Function(
             self,
             "getThemes",
@@ -123,7 +128,7 @@ class PythonStack(Stack):
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
                 "DB_SECRET_ARN": sql_db.secret.secret_arn,
-                "OPENAI_API_KEY": os.environ["OPENAI_API_KEY"],
+                "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
             },
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
@@ -132,6 +137,7 @@ class PythonStack(Stack):
         sql_db.connections.allow_default_port_from(addTheme)
         sql_db.secret.grant_read(addTheme)
         nr_secret.grant_read(addTheme)
+        openai_secret.grant_read(addTheme)
 
         delTheme = lambda_.Function(
             self,

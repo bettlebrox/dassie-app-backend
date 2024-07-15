@@ -220,7 +220,7 @@ class ThemeRepository(BasePostgresRepository):
                     joinedload(self.model._recurrent),
                     joinedload(self.model._sporadic),
                 )
-                .filter(self.model._title == quote_plus(title).lower())
+                .filter(self.model._title == title)
                 .first()
             )
             return themes[0] if themes is not None and type(themes) is list else themes

@@ -289,7 +289,7 @@ def test_get_theme_by_title():
     repo.session = mock_session
 
     # Call the get_by_title method
-    theme = repo.get_by_title("Test Theme")
+    theme = repo.get_by_title("test+theme")
 
     # Assert the result
     assert theme.original_title == "Test Theme"
@@ -339,7 +339,7 @@ def test_add_related_theme():
     )
 
     # Call the add_related method
-    association = repo.add_related(article, ["Test Theme"])
+    association = repo.add_related(article, ["test+theme"])
 
     # Assert that the theme was added and the association was created
     mock_session.return_value.add.assert_called()
