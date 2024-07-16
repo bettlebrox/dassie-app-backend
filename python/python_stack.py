@@ -205,7 +205,10 @@ class PythonStack(Stack):
         )
         cors = apigateway.CorsOptions(
             allow_credentials=True,
-            allow_origins=["http://localhost:5173"],
+            allow_origins=[
+                "http://localhost:5173",
+                "https://main.dkn02440gipss.amplifyapp.com",
+            ],
             allow_methods=["*"],
             allow_headers=["*"],
         )
