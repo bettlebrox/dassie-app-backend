@@ -2,7 +2,10 @@ from unittest.mock import MagicMock
 import sys
 import os
 from urllib.parse import quote_plus
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from sqlalchemy.orm import joinedload
+import pytest
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda")
@@ -196,6 +199,34 @@ def test_upsert_article():
     )
 
 
+@pytest.fixture
+def article_repo():
+    return ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
+
+
+@pytest.fixture
+def article_repo_query(article_repo):
+    mock_query = MagicMock()
+    mock_session = MagicMock()
+    mock_session.return_value.query.return_value = mock_query
+    article_repo.session = mock_session
+    return mock_query
+
+
+def test_get_articles(article_repo, article_repo_query):
+    # Create a mock session and query
+    order_by_mock = article_repo_query.options.return_value.filter.return_value.order_by
+    article_repo.get()
+    assert Article._logged_at.desc().compare(order_by_mock.call_args[0][0])
+
+
+def test_get_articles_by_created_at(article_repo, article_repo_query):
+    # Create a mock session and query
+    order_by_mock = article_repo_query.options.return_value.filter.return_value.order_by
+    article_repo.get(sort_by="created_at")
+    assert Article._created_at.desc().compare(order_by_mock.call_args[0][0])
+
+
 def test_get_articles_by_theme():
     # Create a mock session and query
     mock_query = MagicMock()
@@ -346,3 +377,51 @@ def test_add_related_theme():
     mock_session.return_value.commit.assert_called()
     assert association[0].article_id == article._id
     assert association[0].theme_id == theme._id
+
+
+def test_get_articles_with_custom_days(article_repo, article_repo_query):
+    filter_mock = article_repo_query.options.return_value.filter
+    article_repo.get(days=30)
+    assert (datetime.now() - timedelta(days=30)).date() == filter_mock.call_args[0][
+        0
+    ].right.value.date()
+
+
+def test_get_articles_with_custom_limit(article_repo, article_repo_query):
+    limit_mock = (
+        article_repo_query.options.return_value.filter.return_value.order_by.return_value.limit
+    )
+    article_repo.get(limit=50)
+    limit_mock.assert_called_with(50)
+
+
+def test_get_articles_with_custom_sort_by(article_repo, article_repo_query):
+    order_by_mock = article_repo_query.options.return_value.filter.return_value.order_by
+    article_repo.get(sort_by="title")
+    assert Article._title.desc().compare(order_by_mock.call_args[0][0])
+
+
+def test_get_articles_ascending_order(article_repo, article_repo_query):
+    order_by_mock = article_repo_query.options.return_value.filter.return_value.order_by
+    article_repo.get(descending=False)
+    assert Article._logged_at.asc().compare(order_by_mock.call_args[0][0])
+
+
+def test_get_articles_invalid_sort_by(article_repo, article_repo_query):
+    order_by_mock = article_repo_query.options.return_value.filter.return_value.order_by
+    article_repo.get(sort_by="invalid_field")
+    assert Article._logged_at.desc().compare(order_by_mock.call_args[0][0])
+
+
+def test_get_articles_empty_result(article_repo, article_repo_query):
+    article_repo_query.options.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = (
+        []
+    )
+    result = article_repo.get()
+    assert len(result) == 0
+
+
+def test_get_articles_exception_handling(article_repo, article_repo_query):
+    article_repo_query.options.side_effect = Exception("Database error")
+    with pytest.raises(Exception):
+        article_repo.get()

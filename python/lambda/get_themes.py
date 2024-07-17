@@ -8,22 +8,27 @@ from repos import ThemeRepository
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-secretsmanager = boto3.client("secretsmanager")
-get_secret_value_response = secretsmanager.get_secret_value(
-    SecretId=os.environ["DB_SECRET_ARN"]
-)
-secret = json.loads(get_secret_value_response["SecretString"])
-theme_repo = ThemeRepository(
-    secret["username"],
-    secret["password"],
-    secret["dbname"],
-    os.environ["DB_CLUSTER_ENDPOINT"],
-)
 
 
-def lambda_handler(event, context):
+def initialize_repo():
+    secretsmanager = boto3.client("secretsmanager")
+    get_secret_value_response = secretsmanager.get_secret_value(
+        SecretId=os.environ["DB_SECRET_ARN"]
+    )
+    secret = json.loads(get_secret_value_response["SecretString"])
+    theme_repo = ThemeRepository(
+        secret["username"],
+        secret["password"],
+        secret["dbname"],
+        os.environ["DB_CLUSTER_ENDPOINT"],
+    )
+    return theme_repo
+
+
+def lambda_handler(event, context, theme_repo=None):
+    if theme_repo is None:
+        theme_repo = initialize_repo()
     logger.debug("Event: {} Context: {}".format(event, context))
-    logger.info("getting secret value: " + os.environ["DB_SECRET_ARN"])
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         sort_field = "updated_at"

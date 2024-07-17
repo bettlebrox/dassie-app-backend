@@ -18,12 +18,29 @@ def aws_credentials():
     os.environ["AWS_SECURITY_TOKEN"] = "testing"
     os.environ["AWS_SESSION_TOKEN"] = "testing"
     os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
-    os.environ["DB_SECRET_ARN"] = "DB_SECRET_ARN"
     os.environ["DB_CLUSTER_ENDPOINT"] = "DB_CLUSTER_ENDPOINT"
+    os.environ["DB_SECRET_ARN"] = "DB_SECRET_ARN"
+    os.environ["OPENAIKEY_SECRET_ARN"] = "OPENAIKEY_SECRET_ARN"
+
+
+@pytest.fixture
+def create_secret():
+    with mock_aws():
+        secretsmanager = boto3.client("secretsmanager")
+        response = secretsmanager.create_secret(
+            SecretString='{"username": "username", "password": "password", "dbname": "dbname"}',
+            Name=os.environ["DB_SECRET_ARN"],
+        )
+        response = secretsmanager.create_secret(
+            SecretString='{"OPENAI_API_KEY": "openai_api_key"}',
+            Name="OPENAIKEY_SECRET_ARN",
+        )
+        os.environ["OPENAIKEY_SECRET_ARN"] = response["ARN"]
+        yield secretsmanager
 
 
 @mock_aws
-def test_add_theme(aws_credentials):
+def test_add_theme(aws_credentials, create_secret):
     event = {"body": json.dumps({"title": "new theme"})}
     context = []
     theme_repo = MagicMock()
@@ -39,23 +56,17 @@ def test_add_theme(aws_credentials):
     theme_repo.get_by_title.return_value = None
     theme_repo.get_by_id.return_value = test_theme
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
-    secretsmanager = boto3.client("secretsmanager")
-    response = secretsmanager.create_secret(
-        SecretString='{"username": "username", "password": "password", "dbname": "dbname"}',
-        Name="DB_SECRET_ARN",
-    )
-    os.environ["DB_SECRET_ARN"] = response["ARN"]
     payload = lambda_handler(
         event, context, article_repo, theme_repo, openai_client, themes_service
     )
-    assert payload["statusCode"] == 201
+    assert payload["statusCode"] == 201, f"status code is not 201"
     themes = json.loads(payload["body"])["themes"]
     assert themes[0]["original_title"] == test_theme.original_title
     assert themes[0]["source"] == test_theme.source.value
 
 
 @mock_aws
-def test_add_theme_error(aws_credentials):
+def test_add_theme_error(aws_credentials, create_secret):
     event = {"body": json.dumps({"title": "new theme"})}
     context = []
     theme_repo = MagicMock()
@@ -70,12 +81,6 @@ def test_add_theme_error(aws_credentials):
     ]
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     test_theme = Theme("new theme", "some summary")
-    secretsmanager = boto3.client("secretsmanager")
-    response = secretsmanager.create_secret(
-        SecretString='{"username": "username", "password": "password", "dbname": "dbname"}',
-        Name="DB_SECRET_ARN",
-    )
-    os.environ["DB_SECRET_ARN"] = response["ARN"]
     payload = lambda_handler(
         event, context, article_repo, theme_repo, openai_client, themes_service
     )

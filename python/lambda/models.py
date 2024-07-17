@@ -131,7 +131,7 @@ class Article(Base):
             "text": "" if self._text is None else self._text,
             "source": self._source_navlog,
             "image": self._image,
-            "themes": [theme.original_title for theme in self._themes],
+            "themes": [theme.json(dump=False) for theme in self._themes],
         }
         return json.dumps(json_obj) if dump else json_obj
 

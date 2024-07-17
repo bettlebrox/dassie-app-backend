@@ -46,7 +46,7 @@ def init(article_repo=None, theme_repo=None, openai_client=None, themes_service=
         )
         return (article_repo, openai_client, themes_service)
     except Exception as error:
-        logger.error("Aurora Setup Error: {}".format(error))
+        logger.error("Aurora Setup Error: {}".format(error), exc_info=True)
 
 
 def lambda_handler(

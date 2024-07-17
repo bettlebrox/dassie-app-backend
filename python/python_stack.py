@@ -207,7 +207,7 @@ class PythonStack(Stack):
             allow_credentials=True,
             allow_origins=[
                 "http://localhost:5173",
-                "https://main.dkn02440gipss.amplifyapp.com",
+                "https://main.d1tgde1goqkt1z.amplifyapp.com",
             ],
             allow_methods=["*"],
             allow_headers=["*"],

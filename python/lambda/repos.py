@@ -18,7 +18,7 @@ class BasePostgresRepository:
         )
         self.session = sessionmaker(bind=engine, expire_on_commit=False)
         self._logger = logger
-        Base.metadata.create_all(engine)
+        # Base.metadata.create_all(engine)
 
     def get_all(self):
         with closing(self.session()) as session:
@@ -132,20 +132,24 @@ class ArticleRepository(BasePostgresRepository):
             )
             return query.limit(20).all()
 
-    def get_last_days(self, days=7):
+    def get(self, limit: int = 20, sort_by="logged_at", descending=True):
+        try:
+            sort_by_att = self.model.__dict__["_" + sort_by]
+        except KeyError:
+            sort_by_att = self.model.__dict__["_logged_at"]
         with closing(self.session()) as session:
             return (
                 session.query(self.model)
                 .options(
                     joinedload(self.model._themes),
                 )
-                .filter(self.model._logged_at > datetime.now() - timedelta(days=days))
-                .order_by(self.model._logged_at.desc())
+                .order_by(sort_by_att.desc() if descending else sort_by_att.asc())
+                .limit(limit)
                 .all()
             )
 
     def get_last_7days(self):
-        return self.get_last_days(days=7)
+        return self.get(days=7)
 
 
 class ThemeRepository(BasePostgresRepository):
