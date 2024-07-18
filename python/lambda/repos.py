@@ -118,11 +118,16 @@ class ArticleRepository(BasePostgresRepository):
         List[Article]: A list of Article objects that have an embedding vector similar to the provided `theme_embedding`.
     """
 
-    def get_by_theme_embedding(self, theme_embedding: List[int]):
+    def get_by_theme_embedding(
+        self, theme_embedding: List[int], threshold: float = 0.8, limit: int = 20
+    ):
         with closing(self.session()) as session:
             query = (
                 session.query(self.model)
-                .where((1 - Article._embedding.cosine_distance(theme_embedding)) > 0.8)
+                .where(
+                    (1 - Article._embedding.cosine_distance(theme_embedding))
+                    > threshold
+                )
                 .order_by(Article._embedding.cosine_distance(theme_embedding).asc())
             )
             logger.debug(
@@ -130,7 +135,7 @@ class ArticleRepository(BasePostgresRepository):
                     query.statement.compile(compile_kwargs={"literal_binds": True})
                 )
             )
-            return query.limit(20).all()
+            return query.limit(limit).all()
 
     def get(self, limit: int = 20, sort_by="logged_at", descending=True):
         try:

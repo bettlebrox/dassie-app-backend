@@ -27,7 +27,7 @@ def test_get_themes_with_invalid_params():
     response = lambda_handler(
         {
             "path": "/themes",
-            "queryStringParameters": {"sortField": "count_association", "max": 20},
+            "queryStringParameters": {"sortField": "made_up_sort_field", "max": 20},
         },
         {},
         theme_repo,
