@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker, joinedload
 import logging
 
 logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 class BasePostgresRepository:
@@ -137,15 +138,31 @@ class ArticleRepository(BasePostgresRepository):
             )
             return query.limit(limit).all()
 
-    def get(self, limit: int = 20, sort_by="logged_at", descending=True):
+    def get(
+        self,
+        limit: int = 20,
+        sort_by="logged_at",
+        descending=True,
+        filter_embedding=None,
+        threshold: float = 0.8,
+    ):
         try:
             sort_by_att = self.model.__dict__["_" + sort_by]
         except KeyError:
             sort_by_att = self.model.__dict__["_logged_at"]
         with closing(self.session()) as session:
+            query = session.query(self.model)
+            query = (
+                query.where(
+                    (1 - Article._embedding.cosine_distance(filter_embedding))
+                    > threshold
+                )
+                if filter_embedding is not None
+                else query
+            )
+            logger.info("embedding query :{}".format(query.statement.compile()))
             return (
-                session.query(self.model)
-                .options(
+                query.options(
                     joinedload(self.model._themes),
                 )
                 .order_by(sort_by_att.desc() if descending else sort_by_att.asc())

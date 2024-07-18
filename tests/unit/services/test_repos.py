@@ -293,3 +293,17 @@ def test_add_related_theme():
     mock_session.return_value.commit.assert_called()
     assert association[0].article_id == article._id
     assert association[0].theme_id == theme._id
+
+
+def test_get_articles_with_embedding():
+    mock_session = MagicMock()
+    mock_query = MagicMock()
+    mock_session.return_value.query.return_value = mock_query
+
+    repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
+    repo.session = mock_session
+
+    embedding = [0.1, 0.2, 0.3]
+    repo.get(filter_embedding=embedding, threshold=0.7)
+
+    mock_query.where.assert_called()

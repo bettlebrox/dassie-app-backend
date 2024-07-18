@@ -107,6 +107,7 @@ class PythonStack(Stack):
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
                 "DB_SECRET_ARN": sql_db.secret.secret_arn,
+                "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
             },
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
