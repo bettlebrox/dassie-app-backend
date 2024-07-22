@@ -8,7 +8,12 @@ from models import ThemeType
 
 def test_get_themes():
     theme_repo = MagicMock()
-    response = lambda_handler({"path": "/themes"}, {}, theme_repo)
+    response = lambda_handler(
+        {"path": "/themes"},
+        {},
+        theme_repo,
+        useGlobal=False,
+    )
     assert response["statusCode"] == 200
 
 
@@ -18,6 +23,7 @@ def test_get_theme():
         {"path": "/themes/whats+the+best+way+to+add+google+id+with+cognito%3F"},
         {},
         theme_repo,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
 
@@ -31,6 +37,7 @@ def test_get_themes_with_invalid_params():
         },
         {},
         theme_repo,
+        useGlobal=False,
     )
     assert response["statusCode"] == 400
     response = lambda_handler(
@@ -40,6 +47,7 @@ def test_get_themes_with_invalid_params():
         },
         {},
         theme_repo,
+        useGlobal=False,
     )
     assert response["statusCode"] == 400
 
@@ -53,6 +61,7 @@ def test_get_themes_with_params():
         },
         {},
         theme_repo,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     response = lambda_handler(
@@ -62,6 +71,7 @@ def test_get_themes_with_params():
         },
         {},
         theme_repo,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     response = lambda_handler(
@@ -75,6 +85,7 @@ def test_get_themes_with_params():
         },
         {},
         theme_repo,
+        useGlobal=False,
     )
     theme_repo.get_recent.assert_called_with(2, ThemeType.CUSTOM)
     assert response["statusCode"] == 200

@@ -1,9 +1,5 @@
 import logging
-import boto3
-import os
-import json
-from repos import ArticleRepository
-from services.openai_client import OpenAIClient
+from lambda_init_context import LambdaInitContext
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -16,40 +12,19 @@ VALID_SORT_FIELDS = [
     "logged_at",
     "count_association",
 ]
+init_context = None
 
 
-def init(article_repo=None, openai_client=None):
-    secretsmanager = boto3.client("secretsmanager")
-    if article_repo is None:
-        get_secret_value_response = secretsmanager.get_secret_value(
-            SecretId=os.environ["DB_SECRET_ARN"]
+def lambda_handler(
+    event, context, article_repo=None, openai_client=None, useGlobal=True
+):
+    global init_context
+    if init_context is None or not useGlobal:
+        init_context = LambdaInitContext(
+            article_repo=article_repo, openai_client=openai_client
         )
-        secret = json.loads(get_secret_value_response["SecretString"])
-        article_repo = ArticleRepository(
-            secret["username"],
-            secret["password"],
-            secret["dbname"],
-            os.environ["DB_CLUSTER_ENDPOINT"],
-        )
-    if openai_client is None:
-        get_secret_value_response = secretsmanager.get_secret_value(
-            SecretId=os.environ["OPENAIKEY_SECRET_ARN"]
-        )
-        openaikey_secret = json.loads(get_secret_value_response["SecretString"])
-        openai_client = (
-            (
-                OpenAIClient(openaikey_secret["OPENAI_API_KEY"])
-                if openai_client is None
-                else openai_client
-            )
-            if openai_client is None
-            else openai_client
-        )
-    return article_repo, openai_client
-
-
-def lambda_handler(event, context, article_repo=None, openai_client=None):
-    article_repo, openai_client = init(article_repo, openai_client)
+    openai_client = init_context.openai_client
+    article_repo = init_context.article_repo
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         sort_field = "updated_at"

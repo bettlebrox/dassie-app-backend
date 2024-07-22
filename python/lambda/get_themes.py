@@ -3,32 +3,22 @@ import logging
 import boto3
 import os
 import json
+from lambda_init_context import LambdaInitContext
 from models import ThemeType
-from repos import ThemeRepository
+from theme_repo import ThemeRepository
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
-def initialize_repo():
-    secretsmanager = boto3.client("secretsmanager")
-    get_secret_value_response = secretsmanager.get_secret_value(
-        SecretId=os.environ["DB_SECRET_ARN"]
-    )
-    secret = json.loads(get_secret_value_response["SecretString"])
-    theme_repo = ThemeRepository(
-        secret["username"],
-        secret["password"],
-        secret["dbname"],
-        os.environ["DB_CLUSTER_ENDPOINT"],
-    )
-    return theme_repo
+init_context = None
 
 
-def lambda_handler(event, context, theme_repo=None):
-    if theme_repo is None:
-        theme_repo = initialize_repo()
+def lambda_handler(event, context, theme_repo=None, useGlobal=True):
     logger.debug("Event: {} Context: {}".format(event, context))
+    global init_context
+    if init_context is None or not useGlobal:
+        init_context = LambdaInitContext(theme_repo=theme_repo)
+    theme_repo = init_context.theme_repo
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         sort_field = "updated_at"

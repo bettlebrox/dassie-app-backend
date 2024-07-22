@@ -40,7 +40,11 @@ def test_get_specific_article(article_repo, openai_client):
     test_article._id = 123
     article_repo.get_by_id.return_value = test_article
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     assert "Access-Control-Allow-Origin" in response["headers"]
@@ -53,7 +57,11 @@ def test_get_non_existent_article(article_repo, openai_client):
     context = {}
     article_repo.get_by_id.return_value = None
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 404
     assert "Access-Control-Allow-Origin" in response["headers"]
@@ -68,7 +76,11 @@ def test_get_articles_with_invalid_query_params(article_repo, openai_client):
     }
     context = {}
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 400
     assert "message" in response["body"]
@@ -79,7 +91,11 @@ def test_get_articles_with_no_query_params(article_repo, openai_client):
     context = {}
     article_repo.get.return_value = [Article("test article", "https://bob.com")]
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     assert "Access-Control-Allow-Origin" in response["headers"]
@@ -92,7 +108,11 @@ def test_get_articles_with_database_error(article_repo, openai_client):
     context = {}
     article_repo.get.side_effect = Exception("Database connection error")
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 500
     assert "message" in response["body"]
@@ -107,7 +127,11 @@ def test_get_articles_with_sort_order(article_repo, openai_client):
     context = {}
     article_repo.get.return_value = [Article("test article", "https://example.com")]
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     article_repo.get.assert_called_with(
@@ -122,7 +146,11 @@ def test_get_articles_with_invalid_sort_order(article_repo, openai_client):
     }
     context = {}
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 400
     assert "Invalid sort order" in response["body"]["message"]
@@ -135,7 +163,11 @@ def test_get_articles_with_invalid_sort_field(article_repo, openai_client):
     }
     context = {}
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 400
     assert "Invalid sort field" in response["body"]["message"]
@@ -146,7 +178,11 @@ def test_get_articles_with_default_params(article_repo, openai_client):
     context = {}
     article_repo.get.return_value = [Article("test article", "https://example.com")]
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     article_repo.get.assert_called_with(
@@ -159,7 +195,11 @@ def test_get_articles_empty_result(article_repo, openai_client):
     context = {}
     article_repo.get.return_value = []
     response = lambda_handler(
-        event, context, article_repo=article_repo, openai_client=openai_client
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
     )
     assert response["statusCode"] == 200
     assert response["body"] == "[]"

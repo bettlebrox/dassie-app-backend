@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
+from theme_repo import ThemeRepository
 from models import Article
-from repos import ArticleRepository, ThemeRepository
+from repos import ArticleRepository
 from services.navlogs_service import NavlogService
 from services.articles_service import ArticlesService
 from services.openai_client import OpenAIClient

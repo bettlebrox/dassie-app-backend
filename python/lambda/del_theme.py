@@ -1,29 +1,20 @@
-import json
-import os
 import logging
-from urllib.parse import unquote_plus
 import boto3
-from repos import ThemeRepository
+from lambda_init_context import LambdaInitContext
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 secretsmanager = boto3.client("secretsmanager")
 
+init_context = None
 
-def lambda_handler(event, context):
+
+def lambda_handler(event, context, theme_repo=None):
     logger.info("Event: {} Context: {}".format(event, context))
-    logger.info("getting secret value: " + os.environ["DB_SECRET_ARN"])
-    logger.info(secretsmanager)
-    get_secret_value_response = secretsmanager.get_secret_value(
-        SecretId=os.environ["DB_SECRET_ARN"]
-    )
-    secret = json.loads(get_secret_value_response["SecretString"])
-    theme_repo = ThemeRepository(
-        secret["username"],
-        secret["password"],
-        secret["dbname"],
-        os.environ["DB_CLUSTER_ENDPOINT"],
-    )
+    global init_context
+    if init_context is None:
+        init_context = LambdaInitContext(theme_repo=theme_repo)
+    theme_repo = init_context.theme_repo
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         title = event["path"].split("/")[-1]

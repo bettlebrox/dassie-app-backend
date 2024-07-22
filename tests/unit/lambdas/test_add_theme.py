@@ -57,7 +57,7 @@ def test_add_theme(aws_credentials, create_secret):
     theme_repo.get_by_id.return_value = test_theme
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     payload = lambda_handler(
-        event, context, article_repo, theme_repo, openai_client, themes_service
+        event, context, article_repo, openai_client, themes_service, False
     )
     assert payload["statusCode"] == 201, f"status code is not 201"
     themes = json.loads(payload["body"])["themes"]
@@ -82,7 +82,7 @@ def test_add_theme_error(aws_credentials, create_secret):
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     test_theme = Theme("new theme", "some summary")
     payload = lambda_handler(
-        event, context, article_repo, theme_repo, openai_client, themes_service
+        event, context, article_repo, openai_client, themes_service, useGlobal=False
     )
     assert payload["statusCode"] == 500
     assert json.loads(payload["body"])["message"] == llm_exception.message
