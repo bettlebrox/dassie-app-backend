@@ -46,14 +46,18 @@ def main():
     for navlog in tqdm(navlogs, total=len(navlogs)):
         try:
             body = navlog["body_text"]
-            if len(body) < 100 or "url" not in navlog:
+            if (
+                len(body) < 100
+                or "url" not in navlog
+                or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
+                < datetime.now() - timedelta(days=30)
+            ):
                 continue
             article = article_repo.upsert(
                 Article(
                     navlog["title"],
                     navlog["url"],
                     text=body,
-                    logged_at=navlog["created_at"],
                 )
             )
             if article.summary == "" or article.created_at > datetime.now() - timedelta(
