@@ -228,7 +228,7 @@ class PythonStack(Stack):
         cors = apigateway.CorsOptions(
             allow_credentials=True,
             allow_origins=[
-                "http://localhost:5173",
+                "http://localhost:5174",
                 "https://main.d1tgde1goqkt1z.amplifyapp.com",
             ],
             allow_methods=["*"],
