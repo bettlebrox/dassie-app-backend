@@ -145,6 +145,7 @@ class ThemeRepository(BasePostgresRepository):
 
     def delete(self, model):
         with closing(self.session()) as session:
+            model = session.merge(model)
             session.query(Association).filter(Association.theme_id == model.id).delete()
             session.query(Sporadic).filter(Sporadic.theme_id == model.id).delete()
             session.query(Sporadic).filter(Sporadic.related_id == model.id).delete()
@@ -152,3 +153,4 @@ class ThemeRepository(BasePostgresRepository):
             session.query(Recurrent).filter(Recurrent.related_id == model.id).delete()
             session.delete(model)
             session.commit()
+            session.flush()

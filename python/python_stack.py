@@ -116,6 +116,7 @@ class PythonStack(Stack):
         sql_db.connections.allow_default_port_from(getArticles)
         sql_db.secret.grant_read(getArticles)
         nr_secret.grant_read(getArticles)
+        openai_secret.grant_read(getArticles)
 
         addTheme = lambda_.Function(
             self,
@@ -264,6 +265,7 @@ class PythonStack(Stack):
                 ),
             ),
         )
+
         nr_logger = lambda_.Function.from_function_arn(
             self,
             "NRLogger",

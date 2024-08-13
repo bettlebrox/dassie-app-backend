@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import quote_plus, unquote_plus
 import boto3
 from lambda_init_context import LambdaInitContext
 
@@ -17,9 +18,10 @@ def lambda_handler(event, context, theme_repo=None):
     theme_repo = init_context.theme_repo
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
-        title = event["path"].split("/")[-1]
+        title = quote_plus(unquote_plus(event["pathParameters"]["title"].lower()))
+        logger.info(f"Attempting to delete theme title: {title}")
         if title != "themes":
-            theme = theme_repo.get_by_title(title.lower())
+            theme = theme_repo.get_by_title(title)
             if theme is None:
                 response["statusCode"] = 404
                 response["body"] = {"message": "Theme not found"}
