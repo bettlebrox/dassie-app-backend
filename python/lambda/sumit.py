@@ -42,7 +42,7 @@ def main():
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
-    article_service = ArticlesService(article_repo, theme_repo, openai_client)
+    article_service = ArticlesService(article_repo, theme_repo)
     for navlog in tqdm(navlogs, total=len(navlogs)):
         try:
             body = navlog["body_text"]
@@ -63,7 +63,13 @@ def main():
             if article.summary == "" or article.created_at > datetime.now() - timedelta(
                 days=10
             ):
-                article_service.build_article(article, navlog)
+                article = article_service.build_article_from_navlog(article, navlog)
+                article_service.add_llm_summarisation(
+                    article,
+                    openai_client.get_article_summarization(article.text),
+                    openai_client.get_embedding(article.text),
+                    openai_client.count_tokens(article.text),
+                )
                 logger.info("Built article {}".format(article.title))
         except Exception as error:
             logger.error(error, exc_info=True)

@@ -298,8 +298,8 @@ class Theme(Base):
         secondaryjoin=Sporadic.related_id == _id,
     )
 
-    def __init__(self, title="", summary=None):
-        self._title = quote_plus(title.lower())
+    def __init__(self, original_title="", summary=None):
+        self._title = quote_plus(original_title.lower())
         self._summary = summary
 
     @property

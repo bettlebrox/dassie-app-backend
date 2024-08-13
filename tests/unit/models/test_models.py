@@ -51,7 +51,7 @@ def test_create_article(setup_database):
 
 def test_create_theme(setup_database):
     # Create a new theme
-    theme = Theme(title="Test Theme", summary="This is a test theme")
+    theme = Theme(original_title="Test Theme", summary="This is a test theme")
     session.add(theme)
     session.commit()
 
@@ -73,7 +73,7 @@ def test_associate_article_with_theme(setup_database):
         summary="This is a test article",
         url="https://example.com",
     )
-    theme = Theme(title="Test Theme", summary="This is a test theme")
+    theme = Theme(original_title="Test Theme", summary="This is a test theme")
     session.add(article)
     session.add(theme)
     session.commit()
@@ -96,8 +96,8 @@ def test_associate_article_with_theme(setup_database):
 
 def test_create_recurrent_theme(setup_database):
     # Create a new recurrent theme
-    theme1 = Theme(title="Theme 1", summary="This is theme 1")
-    theme2 = Theme(title="Theme 2", summary="This is theme 2")
+    theme1 = Theme(original_title="Theme 1", summary="This is theme 1")
+    theme2 = Theme(original_title="Theme 2", summary="This is theme 2")
     session.add(theme1)
     session.add(theme2)
     session.commit()
@@ -118,8 +118,8 @@ def test_create_recurrent_theme(setup_database):
 
 def test_create_sporadic_theme(setup_database):
     # Create a new sporadic theme
-    theme1 = Theme(title="Theme 1", summary="This is theme 1")
-    theme2 = Theme(title="Theme 2", summary="This is theme 2")
+    theme1 = Theme(original_title="Theme 1", summary="This is theme 1")
+    theme2 = Theme(original_title="Theme 2", summary="This is theme 2")
     session.add(theme1)
     session.add(theme2)
     session.commit()

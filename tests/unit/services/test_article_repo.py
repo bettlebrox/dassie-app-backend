@@ -79,7 +79,7 @@ def test_enhance_article():
         summary="This is a test article",
         url="https://example.com",
     )
-    themes = [Theme(title="Theme 1"), Theme(title="Theme 2")]
+    themes = [Theme(original_title="Theme 1"), Theme(original_title="Theme 2")]
     embedding = [1, 2, 3]
     mock_session.return_value.merge.return_value = article
     # Call the enhance method

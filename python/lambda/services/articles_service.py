@@ -5,18 +5,27 @@ logger = logging.getLogger()
 
 
 class ArticlesService:
-    def __init__(self, article_repo, theme_repo, openai_client):
+    def __init__(self, article_repo, theme_repo):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
-        self._openai_client = openai_client
 
-    def build_article(self, current_article, navlog):
-        article_summary = self._openai_client.get_article_summarization(
-            navlog["body_text"]
-        )
+    def add_llm_summarisation(
+        self, current_article, article_summary, embedding, token_count
+    ):
+        if article_summary is None:
+            return
+        logger.debug(f"Adding article summary: {article_summary}")
+        if "summary" in article_summary and article_summary["summary"] is not None:
+            current_article.summary = article_summary["summary"]
+            current_article.embedding = embedding
+            current_article.token_count = token_count
+            current_article.updated_at = datetime.now()
+            self._article_repo.update(current_article)
+        if "themes" in article_summary and article_summary["themes"] is not None:
+            self._theme_repo.add_related(current_article, article_summary["themes"])
+
+    def build_article_from_navlog(self, current_article, navlog):
         current_article.source_navlog = navlog["id"]
-        embedding = self._openai_client.get_embedding(navlog["body_text"])
-        current_article.embedding = embedding
         current_article.tab_id = navlog["tabId"]
         current_article.document_id = (
             navlog["documentId"]
@@ -29,18 +38,12 @@ class ArticlesService:
             and navlog["parentDocumentId"] != "undefined"
             else None
         )
-        if article_summary is not None:
-            current_article.summary = article_summary["summary"]
         current_article.logged_at = datetime.strptime(
             navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f"
         )
+        current_article.updated_at = datetime.now()
         current_article.text = navlog["body_text"]
-        current_article.token_count = self._openai_client.count_tokens(
-            navlog["body_text"]
-        )
         if "image" in navlog and navlog["image"] is not None:
             current_article.image = navlog["image"]
         current_article = self._article_repo.update(current_article)
-        if article_summary is not None:
-            self._theme_repo.add_related(current_article, article_summary["themes"])
         return current_article

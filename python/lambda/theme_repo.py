@@ -105,14 +105,15 @@ class ThemeRepository(BasePostgresRepository):
             Association: The newly created association.
     """
 
-    def add_related(self, article: Article, theme_titles: List[str]):
+    def add_related(self, article: Article, theme_original_titles: List[str]):
         with closing(self.session()) as session:
             associations = []
-            for theme_title in theme_titles:
-                theme = self.get_by_title(theme_title)
+            for theme_title in theme_original_titles:
+                theme = self.get_by_title(quote_plus(theme_title))
                 if theme is None:
                     theme = Theme(theme_title)
                     session.add(theme)
+                    logger.debug(f"Adding new theme: {theme.title}")
                     session.commit()
                 association = Association(article.id, theme._id)
                 duplicate_association = (
@@ -124,13 +125,14 @@ class ThemeRepository(BasePostgresRepository):
                     .first()
                 )
                 if duplicate_association is not None:
-                    return duplicate_association
+                    associations.append(duplicate_association)
+                    break
                 session.add(association)
                 session.commit()
                 associations.append(association)
-                logger.info(
+                logger.debug(
                     "Added association between article {} and theme {}".format(
-                        article.id, theme._id
+                        article.title, theme.title
                     )
                 )
             return associations
@@ -146,11 +148,9 @@ class ThemeRepository(BasePostgresRepository):
     def delete(self, model):
         with closing(self.session()) as session:
             model = session.merge(model)
-            session.query(Association).filter(Association.theme_id == model.id).delete()
-            session.query(Sporadic).filter(Sporadic.theme_id == model.id).delete()
-            session.query(Sporadic).filter(Sporadic.related_id == model.id).delete()
-            session.query(Recurrent).filter(Recurrent.theme_id == model.id).delete()
-            session.query(Recurrent).filter(Recurrent.related_id == model.id).delete()
+            model.recurrent = []
+            model.sporadic = []
+            model.related = []
             session.delete(model)
             session.commit()
             session.flush()

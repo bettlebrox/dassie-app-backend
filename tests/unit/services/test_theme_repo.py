@@ -21,8 +21,8 @@ def mock_query(repo: ThemeRepository) -> Any:
 def test_get_all_themes(repo: ThemeRepository, mock_query: Any):
     # Mock the query result
     mock_query.all.return_value = [
-        Theme(title="Test Theme 1"),
-        Theme(title="Test Theme 2"),
+        Theme(original_title="Test Theme 1"),
+        Theme(original_title="Test Theme 2"),
     ]
 
     # Call the get_all method
@@ -36,7 +36,7 @@ def test_get_all_themes(repo: ThemeRepository, mock_query: Any):
 
 def test_get_theme_by_title(repo: ThemeRepository, mock_query: Any):
     mock_query.options.return_value.filter.return_value.first.return_value = [
-        Theme(title="Test Theme")
+        Theme(original_title="Test Theme")
     ]
 
     # Call the get_by_title method
@@ -48,7 +48,9 @@ def test_get_theme_by_title(repo: ThemeRepository, mock_query: Any):
 
 def test_get_theme_by_titles(repo: ThemeRepository, mock_query: Any):
     # Mock the query result
-    mock_query.filter.return_value.all.return_value = [Theme(title="Test Theme")]
+    mock_query.filter.return_value.all.return_value = [
+        Theme(original_title="Test Theme")
+    ]
 
     # Call the get_by_titles method
     themes = repo.get_by_titles(["Test Theme"])
@@ -59,7 +61,7 @@ def test_get_theme_by_titles(repo: ThemeRepository, mock_query: Any):
 
 
 def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
-    theme = Theme(title="Test Theme")
+    theme = Theme(original_title="Test Theme")
     mock_query.options.return_value.filter.return_value.first.return_value = [theme]
     mock_query.filter.return_value.first.return_value = None
 
@@ -81,7 +83,7 @@ def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
 
 
 def test_del_related_article(repo: ThemeRepository, mock_query: Any):
-    theme = Theme(title="Test Theme")
+    theme = Theme(original_title="Test Theme")
     test_article = Article(
         title="Test Article",
         summary="This is a test article",
