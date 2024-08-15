@@ -52,12 +52,14 @@ def lambda_handler(
             return response
         embedding = openai_client.get_embedding(title)
         related = article_repo.get_by_theme_embedding(embedding)
-        themes = theme_service.build_themes_from_related_articles(
+        theme = theme_service.build_theme_from_related_articles(
             related, ThemeType.CUSTOM, title, embedding
         )
-        response["body"] = '{{"themes": [{}]}}'.format(
-            ",".join(theme.json() for theme in themes)
-        )
+        if theme is None:
+            response["statusCode"] = 204
+            response["body"] = json.dumps({"message": "Theme not found"})
+            return response
+        response["body"] = theme.json()
         return response
     except Exception as error:
         logger.error("Error: {}".format(error), exc_info=True)

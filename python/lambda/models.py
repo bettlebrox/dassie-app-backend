@@ -2,9 +2,10 @@ from datetime import datetime
 import json
 from typing import List
 import uuid
+import numpy as np
 from sqlalchemy.orm import declarative_base
 import enum
-from sqlalchemy import Column, Enum, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Column, Enum, Float, ForeignKey, Integer, String, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from urllib.parse import quote_plus, unquote_plus
 from sqlalchemy.orm import relationship
@@ -111,6 +112,7 @@ class Article(Base):
         self._url = url
         self._logged_at = logged_at
         self._text = text
+        self._token_count = 0
 
     def json(self, dump=True) -> str:
         json_obj = {
@@ -277,6 +279,7 @@ class Theme(Base):
     _created_at = Column(DateTime, default=datetime.now())
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _embedding = Column(Vector(1536))
+    _avg_article_distance = Column(Float, default=0.0)
     _related = relationship(
         "Article", secondary="association", order_by=Article._created_at
     )
@@ -301,6 +304,21 @@ class Theme(Base):
     def __init__(self, original_title="", summary=None):
         self._title = quote_plus(original_title.lower())
         self._summary = summary
+
+    def calculate_avg_cos_distance_per_article(self):
+        if self._embedding is None or len(self._related) == 0:
+            return 0
+        return sum(
+            1 - self.cosine_similarity(self._embedding, article.embedding)
+            for article in self._related
+        ) / len(self._related)
+
+    def cosine_similarity(self, embedding1, embedding2):
+        np_embedding1 = np.array(embedding1)
+        np_embedding2 = np.array(embedding2)
+        np.dot(np_embedding1, np_embedding2) / (
+            np.linalg.norm(np_embedding1) * np.linalg.norm(np_embedding2)
+        )
 
     @property
     def id(self):
@@ -344,7 +362,13 @@ class Theme(Base):
 
     @related.setter
     def related(self, value: List[Article]):
+        if self._related != value:
+            self._avg_article_distance = self.calculate_avg_cos_distance_per_article()
         self._related = value
+
+    @property
+    def avg_article_distance(self):
+        return self._avg_article_distance
 
     @property
     def recurrent(self):
@@ -372,6 +396,7 @@ class Theme(Base):
             "title": self.title,
             "original_title": self.original_title,
             "summary": self.summary,
+            "avg_cosine_distance_per_article": self.avg_article_distance,
             "created_at": (
                 self.created_at.isoformat() if self.created_at is not None else ""
             ),

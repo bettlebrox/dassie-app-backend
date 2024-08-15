@@ -14,10 +14,10 @@ import weave
 
 LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 logger = logging.getLogger()
-handler = logging.FileHandler("/tmp/sumit.log")
+handler = logging.FileHandler("/tmp/sumit_long.log")
 handler.setFormatter(logging.Formatter(LOG_FORMAT))
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 def main():
@@ -50,7 +50,7 @@ def main():
                 len(body) < 100
                 or "url" not in navlog
                 or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
-                < datetime.now() - timedelta(days=30)
+                < datetime.now() - timedelta(days=90)
             ):
                 continue
             article = article_repo.upsert(
@@ -72,7 +72,7 @@ def main():
                 )
                 logger.info("Built article {}".format(article.title))
         except Exception as error:
-            logger.error(error, exc_info=True)
+            logger.error(f"{error} navlog:{navlog}", exc_info=True)
 
 
 if __name__ == "__main__":

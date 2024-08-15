@@ -60,9 +60,9 @@ def test_add_theme(aws_credentials, create_secret):
         event, context, article_repo, openai_client, themes_service, False
     )
     assert payload["statusCode"] == 201, f"status code is not 201"
-    themes = json.loads(payload["body"])["themes"]
-    assert themes[0]["original_title"] == test_theme.original_title
-    assert themes[0]["source"] == test_theme.source.value
+    theme = json.loads(payload["body"])
+    assert theme["original_title"] == test_theme.original_title
+    assert theme["source"] == test_theme.source.value
 
 
 @mock_aws

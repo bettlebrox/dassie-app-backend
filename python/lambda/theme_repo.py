@@ -89,9 +89,9 @@ class ThemeRepository(BasePostgresRepository):
             )
             return themes[0] if themes is not None and type(themes) is list else themes
 
-    def get_by_titles(self, titles: List[str]):
+    def get_by_original_titles(self, original_titles: List[str]):
         with closing(self.session()) as session:
-            titles = [quote_plus(title) for title in titles]
+            titles = [quote_plus(title) for title in original_titles]
             return session.query(self.model).filter(self.model._title.in_(titles)).all()
 
     """
@@ -109,7 +109,7 @@ class ThemeRepository(BasePostgresRepository):
         with closing(self.session()) as session:
             associations = []
             for theme_title in theme_original_titles:
-                theme = self.get_by_title(quote_plus(theme_title))
+                theme = self.get_by_title(quote_plus(theme_title.lower()))
                 if theme is None:
                     theme = Theme(theme_title)
                     session.add(theme)
@@ -151,6 +151,9 @@ class ThemeRepository(BasePostgresRepository):
             model.recurrent = []
             model.sporadic = []
             model.related = []
+            session.merge(model)
+            session.query(Recurrent).filter(Recurrent.related_id == model.id).delete()
+            session.query(Sporadic).filter(Sporadic.related_id == model.id).delete()
             session.delete(model)
             session.commit()
             session.flush()

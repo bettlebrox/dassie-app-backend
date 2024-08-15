@@ -38,14 +38,10 @@ def main():
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     top_themes = theme_repo.get_top(100)
     for theme in top_themes:
-        embedding = (
-            theme.embedding
-            if theme.embedding is not None
-            else openai_client.get_embedding(theme.original_title)
-        )
-        articles = article_repo.get_by_theme_embedding(embedding)
         try:
-            themes_service.build_themes_from_related_articles(articles, ThemeType.TOP)
+            themes_service.build_theme_from_related_articles(
+                theme.related, ThemeType.TOP, theme.original_title
+            )
         except LLMResponseException as e:
             logger.error(f"Failed to build themes from related articles: {e}")
 

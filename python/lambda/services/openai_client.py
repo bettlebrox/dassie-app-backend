@@ -1,7 +1,8 @@
-from openai import OpenAI
 import logging
 import json
 import tiktoken
+from langfuse.decorators import observe
+from langfuse.openai import openai
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -40,8 +41,9 @@ class OpenAIClient:
     TEMPERATURE = 0
 
     def __init__(self, api_key):
-        self.openai_client = OpenAI(api_key=api_key)
+        self.openai_client = openai(api_key=api_key)
 
+    @observe()
     def get_embedding(self, article, model="text-embedding-ada-002"):
         article = article.replace("\n", " ")
         try:
@@ -55,6 +57,7 @@ class OpenAIClient:
             logger.error(f"get_embeddings Error: {error}")
             return None
 
+    @observe()
     def get_completion(self, prompt, query, model=MODEL):
         if len(query) < 100:
             logger.info(f"query too short: {len(query)}")
@@ -89,12 +92,14 @@ class OpenAIClient:
             logger.error(f"get_completion Error: {error}", exc_info=True)
         return None
 
+    @observe()
     def get_article_summarization(self, article):
         if len(article) < 100:
             logger.info(f"article too short: {len(article)}")
             return None
         return self.get_completion(self.ARTICLE_SUMMARY_PROMPT, article)
 
+    @observe()
     def get_theme_summarization(self, texts):
         return self.get_completion(self.THEME_SUMMARY_PROMPT, "\n---\n".join(texts))
 

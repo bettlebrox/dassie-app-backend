@@ -1,11 +1,6 @@
-from urllib.parse import unquote_plus
 import logging
-import boto3
-import os
-import json
 from lambda_init_context import LambdaInitContext
 from models import ThemeType
-from theme_repo import ThemeRepository
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

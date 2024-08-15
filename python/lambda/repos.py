@@ -29,16 +29,13 @@ class BasePostgresRepository:
 
     def get_by_title(self, title):
         with closing(self.session()) as session:
-            return session.query(self.model).filter_by(_title=title).all()
+            return session.query(self.model).filter_by(_title=title).first()
 
     def upsert(self, model):
-        existing = self.get_by_title(model._title)
-        if type(existing) is list and len(existing) > 0:
-            return existing[0]
-        with closing(self.session()) as session:
-            session.add(model)
-            session.commit()
-            return model
+        if self.get_by_title(model.title) is None:
+            return self.add(model)
+        else:
+            return self.update(model)
 
     def add(self, model):
         with closing(self.session()) as session:

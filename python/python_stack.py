@@ -64,6 +64,20 @@ class PythonStack(Stack):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Requirements layer",
         )
+        reqs_layer_1 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended",
+            entry="python/layer1",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
+        )
+        reqs_layer_2 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended2",
+            entry="python/layer2",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
+        )
         nr_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
             "nr_license_key",
@@ -81,7 +95,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_themes.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
@@ -102,7 +116,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_articles.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
@@ -125,7 +139,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
@@ -148,7 +162,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
@@ -169,7 +183,7 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_related.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
             security_groups=sql_db.connections.security_groups,
             environment={
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,

@@ -53,7 +53,7 @@ def test_get_theme_by_titles(repo: ThemeRepository, mock_query: Any):
     ]
 
     # Call the get_by_titles method
-    themes = repo.get_by_titles(["Test Theme"])
+    themes = repo.get_by_original_titles(["Test Theme"])
 
     # Assert the result
     assert len(themes) == 1
