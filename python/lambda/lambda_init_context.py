@@ -14,6 +14,7 @@ from theme_repo import ThemeRepository
 
 class LambdaInitContext:
     OPENAI_SECRET_KEY = "OPENAI_API_KEY"
+    LANGFUSE_SECRET_KEY = "langfuse_secret_key"
 
     def __init__(
         self,
@@ -63,7 +64,14 @@ class LambdaInitContext:
                 SecretId=os.environ["OPENAIKEY_SECRET_ARN"]
             )
             secret = json.loads(get_secret_value_response["SecretString"])
-            self._openai_client = OpenAIClient(secret[self.OPENAI_SECRET_KEY])
+            get_secret_value_response = self.secrets_manager.get_secret_value(
+                SecretId=os.environ["LANGFUSE_SECRET_ARN"]
+            )
+            lang_fuse_secret = json.loads(get_secret_value_response["SecretString"])
+            self._openai_client = OpenAIClient(
+                secret[self.OPENAI_SECRET_KEY],
+                lang_fuse_secret[self.LANGFUSE_SECRET_KEY],
+            )
         return self._openai_client
 
     @property

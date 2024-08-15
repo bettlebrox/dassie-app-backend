@@ -1,8 +1,10 @@
 import logging
 import json
 import tiktoken
+from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
-from langfuse.openai import openai
+from langfuse.openai import OpenAI
+
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -40,8 +42,13 @@ class OpenAIClient:
 
     TEMPERATURE = 0
 
-    def __init__(self, api_key):
-        self.openai_client = openai(api_key=api_key)
+    def __init__(self, api_key, langfuse_key):
+        self.openai_client = OpenAI(api_key=api_key)
+        langfuse_context.configure(
+            secret_key=langfuse_key,
+            public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
+            host="https://cloud.langfuse.com",
+        )
 
     @observe()
     def get_embedding(self, article, model="text-embedding-ada-002"):

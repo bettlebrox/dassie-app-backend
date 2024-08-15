@@ -1,7 +1,7 @@
 import json
 from os import path
 import os
-from aws_cdk import Stack, CfnOutput, Duration
+from aws_cdk import Fn, Stack, CfnOutput, Duration
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_lambda_python_alpha as lambda_python
@@ -21,10 +21,63 @@ ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
 ApiGatewayStageStackOutput = "ApiStage"
 
+PythonLayerStackOutput = "PythonLayerStackARN"
+PythonLayerStackOutput1 = "PythonLayerStackARN1"
+PythonLayerStackOutput2 = "PythonLayerStackARN2"
+
+
+class PythonDependenciesStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        reqs_layer = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayer",
+            entry="python/layer",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Requirements layer",
+        )
+        reqs_layer_1 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended",
+            entry="python/layer1",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
+        )
+        reqs_layer_2 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended2",
+            entry="python/layer2",
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
+        )
+        CfnOutput(
+            self,
+            PythonLayerStackOutput,
+            value=reqs_layer.layer_version_arn,
+            export_name="PythonLayerStackARN",
+        )
+        CfnOutput(
+            self,
+            PythonLayerStackOutput1,
+            value=reqs_layer_1.layer_version_arn,
+            export_name="PythonLayerStackARN1",
+        )
+        CfnOutput(
+            self,
+            PythonLayerStackOutput2,
+            value=reqs_layer_2.layer_version_arn,
+            export_name="PythonLayerStackARN2",
+        )
+
 
 class PythonStack(Stack):
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
         bucket = s3.Bucket(
             self,
@@ -57,26 +110,20 @@ class PythonStack(Stack):
             ),
             index_name="type-index",
         )
-        reqs_layer = lambda_python.PythonLayerVersion(
+        reqs_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayer",
-            entry="python/layer",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:37",
         )
-        reqs_layer_1 = lambda_python.PythonLayerVersion(
+        reqs_layer_1 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended",
-            entry="python/layer1",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended6C14504C:2",
         )
-        reqs_layer_2 = lambda_python.PythonLayerVersion(
+        reqs_layer_2 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
-            "RequirementsLayerExtended2",
-            entry="python/layer2",
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
+            "RequirementsLayerExtended1",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:3",
         )
         nr_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
@@ -87,6 +134,11 @@ class PythonStack(Stack):
             self,
             "openai_api_key",
             secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
+        )
+        langfuse_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "langfuse_secret_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
         )
         getThemes = lambda_.Function(
             self,
@@ -122,6 +174,7 @@ class PythonStack(Stack):
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
                 "DB_SECRET_ARN": sql_db.secret.secret_arn,
                 "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
+                "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
             },
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
@@ -131,6 +184,7 @@ class PythonStack(Stack):
         sql_db.secret.grant_read(getArticles)
         nr_secret.grant_read(getArticles)
         openai_secret.grant_read(getArticles)
+        langfuse_secret.grant_read(getArticles)
 
         addTheme = lambda_.Function(
             self,
@@ -145,6 +199,7 @@ class PythonStack(Stack):
                 "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
                 "DB_SECRET_ARN": sql_db.secret.secret_arn,
                 "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
+                "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
             },
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
@@ -154,6 +209,7 @@ class PythonStack(Stack):
         sql_db.secret.grant_read(addTheme)
         nr_secret.grant_read(addTheme)
         openai_secret.grant_read(addTheme)
+        langfuse_secret.grant_read(addTheme)
 
         delTheme = lambda_.Function(
             self,

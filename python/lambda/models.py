@@ -308,15 +308,18 @@ class Theme(Base):
     def calculate_avg_cos_distance_per_article(self):
         if self._embedding is None or len(self._related) == 0:
             return 0
-        return sum(
-            1 - self.cosine_similarity(self._embedding, article.embedding)
-            for article in self._related
-        ) / len(self._related)
+        return float(
+            sum(
+                1 - self.cosine_similarity(self._embedding, article.embedding)
+                for article in self._related
+            )
+            / len(self._related)
+        )
 
     def cosine_similarity(self, embedding1, embedding2):
         np_embedding1 = np.array(embedding1)
         np_embedding2 = np.array(embedding2)
-        np.dot(np_embedding1, np_embedding2) / (
+        return np.dot(np_embedding1, np_embedding2) / (
             np.linalg.norm(np_embedding1) * np.linalg.norm(np_embedding2)
         )
 
