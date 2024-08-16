@@ -21,6 +21,41 @@ class JsonFunctionEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
+class Browsed(Base):
+    __tablename__ = "browsed"
+    _article_id = Column(
+        UUID(as_uuid=True), ForeignKey("article._id"), primary_key=True
+    )
+    _browse_id = Column(UUID(as_uuid=True), ForeignKey("browse._id"), primary_key=True)
+    _count = Column(Integer, default=1)
+    _time = Column(Integer, default=0)
+    _created_at = Column(DateTime, default=datetime.now())
+
+    @property
+    def article_id(self):
+        return self._article_id
+
+    @article_id.setter
+    def article_id(self, value):
+        self._article_id = value
+
+    @property
+    def browse_id(self):
+        return self._browse_id
+
+    @browse_id.setter
+    def browse_id(self, value):
+        self._browse_id = value
+
+    @property
+    def created_at(self):
+        return self._created_at
+
+    @created_at.setter
+    def created_at(self, value):
+        self._created_at = value
+
+
 class Association(Base):
     __tablename__ = "association"
     article_id = Column(
@@ -101,13 +136,13 @@ class Article(Base):
 
     def __init__(
         self,
-        title: str,
+        original_title: str,
         url: str,
         summary: str = None,
         logged_at: datetime = None,
         text: str = None,
     ):
-        self._title = quote_plus(title)
+        self._title = quote_plus(original_title)
         self._summary = summary
         self._url = url
         self._logged_at = logged_at
@@ -118,7 +153,7 @@ class Article(Base):
         json_obj = {
             "id": str(self._id),
             "title": self._title,
-            "original_title": unquote_plus(self._title),
+            "original_title": self.original_title,
             "summary": self._summary,
             "created_at": (
                 "" if self._created_at is None else self._created_at.isoformat()
@@ -145,9 +180,17 @@ class Article(Base):
     def title(self):
         return self._title
 
+    @property
+    def original_title(self):
+        return unquote_plus(self._title)
+
+    @original_title.setter
+    def original_title(self, value):
+        self._title = quote_plus(value)
+
     @title.setter
     def title(self, value):
-        self._title = quote_plus(value)
+        self._title = value
 
     @property
     def summary(self):
@@ -268,6 +311,24 @@ class ThemeType(enum.Enum):
     TOP = "top"
     RECURRENT = "recurrent"
     SPORADIC = "sporadic"
+
+
+class Browse(Base):
+    __tablename__ = "browse"
+    _id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    _title = Column(String)
+    _created_at = Column(DateTime, default=datetime.now())
+    _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
+    _logged_at = Column(DateTime, index=True)
+    _articles = relationship("Article", secondary="browsed")
+
+    def __init__(self, original_title, logged_at):
+        self._title = (
+            quote_plus(original_title.lower())
+            if original_title is not None
+            else original_title
+        )
+        self._logged_at = logged_at
 
 
 class Theme(Base):

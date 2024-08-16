@@ -67,7 +67,7 @@ def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
 
     # Create a new article and theme
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -85,7 +85,7 @@ def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
 def test_del_related_article(repo: ThemeRepository, mock_query: Any):
     theme = Theme(original_title="Test Theme")
     test_article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )

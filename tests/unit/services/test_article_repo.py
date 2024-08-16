@@ -49,7 +49,7 @@ def test_get_articles_by_theme(article_repo, article_repo_query):
     ]
     articles = [
         Article(
-            title="Test Article",
+            original_title="Test Article",
             summary="This is a test article",
             url="https://example.com",
         )
@@ -75,7 +75,7 @@ def test_enhance_article():
 
     # Create a new article, themes, and embedding
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -156,7 +156,7 @@ def test_upsert_article():
 
     # Create a new article
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -187,13 +187,13 @@ def test_get_article_by_url():
     # Mock the query result
     mock_query.options.return_value.filter_by.return_value.all.return_value = [
         Article(
-            title="Test Article",
+            original_title="Test Article",
             url="https://example.com",
             summary="This is a test article",
         )
     ]
     mock_session.return_value.merge.return_value = Article(
-        title="Test Article",
+        original_title="Test Article",
         url="https://example.com",
         summary="This is a test article",
     )
@@ -215,7 +215,7 @@ def test_update_article():
 
     # Create a new article
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -238,7 +238,7 @@ def test_delete_article():
 
     # Create a new article
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -255,7 +255,7 @@ def test_add_article():
     # Create a mock session
     mock_session = MagicMock()
     mock_session.return_value.merge.return_value = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -266,7 +266,7 @@ def test_add_article():
 
     # Create a new article
     article = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -282,7 +282,7 @@ def test_get_article_by_id():
     # Create a mock session
     mock_session = MagicMock()
     mock_session.return_value.query.return_value.options.return_value.filter.return_value.one.return_value = Article(
-        title="Test Article",
+        original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
@@ -303,12 +303,12 @@ def test_get_all_articles():
     mock_session = MagicMock()
     mock_session.return_value.query.return_value.all.return_value = [
         Article(
-            title="Test Article 1",
+            original_title="Test Article 1",
             summary="This is a test article",
             url="https://example.com",
         ),
         Article(
-            title="Test Article 2",
+            original_title="Test Article 2",
             summary="This is another test article",
             url="https://example.com",
         ),

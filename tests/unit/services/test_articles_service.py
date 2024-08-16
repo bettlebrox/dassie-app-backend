@@ -31,7 +31,7 @@ def test_build_article():
         "created_at": "2022-01-01T00:00:00.00",
         "tabId": "12234",
     }
-    article = Article(title="Test Article 1", url="https://example.com")
+    article = Article(original_title="Test Article 1", url="https://example.com")
     article._id = 1
     mock_theme = Theme(original_title="testing")
     mock_theme._id = 1
