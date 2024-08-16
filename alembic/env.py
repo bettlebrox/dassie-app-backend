@@ -1,5 +1,7 @@
 from logging.config import fileConfig
-from models import Base
+from models.models import Base
+from models.article import Article
+from models.theme import Theme, ThemeType
 from sqlalchemy import create_engine
 from sqlalchemy import pool
 import boto3

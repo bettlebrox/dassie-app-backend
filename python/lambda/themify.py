@@ -1,5 +1,5 @@
 from theme_repo import ThemeRepository
-from models import ThemeType
+from models.theme import ThemeType
 from repos import ArticleRepository
 from services.openai_client import LLMResponseException, OpenAIClient
 import boto3

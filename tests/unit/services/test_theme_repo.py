@@ -3,7 +3,9 @@ from unittest.mock import MagicMock
 
 import pytest
 from theme_repo import ThemeRepository
-from models import Article, Association, Theme
+from models.models import Association
+from models.article import Article
+from models.theme import Theme
 
 
 @pytest.fixture

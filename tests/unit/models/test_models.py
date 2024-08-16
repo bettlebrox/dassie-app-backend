@@ -18,9 +18,7 @@ def setup_database_engine():
 sys.path.append(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda")
 )
-from models import (
-    Article,
-    Theme,
+from models.models import (
     Association,
     Recurrent,
     Sporadic,
@@ -28,6 +26,8 @@ from models import (
     Browsed,
     Browse,
 )
+from models.article import Article
+from models.theme import Theme
 
 
 @pytest.fixture

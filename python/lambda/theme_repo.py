@@ -1,4 +1,6 @@
-from models import Article, Association, Recurrent, Sporadic, Theme, ThemeType
+from models.models import Association, Recurrent, Sporadic
+from models.article import Article
+from models.theme import Theme, ThemeType
 from repos import BasePostgresRepository, logger
 
 

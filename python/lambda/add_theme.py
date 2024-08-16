@@ -5,7 +5,7 @@ import boto3
 
 from lambda_init_context import LambdaInitContext
 from theme_repo import ThemeRepository
-from models import ThemeType
+from models.theme import ThemeType
 from repos import ArticleRepository
 from services.openai_client import OpenAIClient
 from services.themes_service import ThemesService

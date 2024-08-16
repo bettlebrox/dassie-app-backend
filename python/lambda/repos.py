@@ -1,7 +1,9 @@
 from contextlib import closing
 from typing import List
 from sqlalchemy import create_engine
-from models import Article, Theme, Association, Base
+from models.models import Association, Browse, Browsed
+from models.article import Article
+from models.theme import Theme
 from sqlalchemy.orm import sessionmaker, joinedload
 import logging
 
@@ -31,7 +33,7 @@ class BasePostgresRepository:
         with closing(self.session()) as session:
             return session.query(self.model).filter_by(_title=title).first()
 
-    def upsert(self, model):
+    def get_or_insert(self, model):
         if self.get_by_title(model.title) is None:
             return self.add(model)
         else:
@@ -53,6 +55,42 @@ class BasePostgresRepository:
             detached = session.merge(model)
             session.commit()
             return detached
+
+
+class BrowsedRepository(BasePostgresRepository):
+    def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
+        super().__init__(username, password, dbname, db_cluster_endpoint, logger)
+        self.model = Browsed
+
+    def get_by_browse_and_article(self, browse_id, article_id):
+        with closing(self.session()) as session:
+            return (
+                session.query(self.model)
+                .filter_by(_browse_id=browse_id, _article_id=article_id)
+                .first()
+            )
+
+
+class BrowseRepository(BasePostgresRepository):
+    def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
+        super().__init__(username, password, dbname, db_cluster_endpoint, logger)
+        self.model = Browse
+
+    def get_by_tab_id(self, tab_id):
+        with closing(self.session()) as session:
+            return (
+                session.query(self.model)
+                .options(joinedload(Browse._articles))
+                .filter_by(_tab_id=tab_id)
+                .first()
+            )
+
+    def get_or_insert(self, model):
+        existing = self.get_by_tab_id(model.tab_id)
+        if existing is None:
+            return self.add(model)
+        else:
+            return existing
 
 
 class ArticleRepository(BasePostgresRepository):
@@ -83,7 +121,7 @@ class ArticleRepository(BasePostgresRepository):
                 detached = session.merge(articles[0])
                 return detached
 
-    def upsert(self, model):
+    def get_or_insert(self, model):
         existing = self.get_by_url(model.url)
         if existing is not None:
             return existing

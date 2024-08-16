@@ -1,13 +1,17 @@
 import logging
 from datetime import datetime
 
+from models.models import Browse, Browsed
+
 logger = logging.getLogger()
 
 
 class ArticlesService:
-    def __init__(self, article_repo, theme_repo):
+    def __init__(self, article_repo, theme_repo, browse_repo, browsed_repo):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
+        self._browse_repo = browse_repo
+        self._browsed_repo = browsed_repo
 
     def add_llm_summarisation(
         self, current_article, article_summary, embedding, token_count
@@ -23,6 +27,28 @@ class ArticlesService:
             self._article_repo.update(current_article)
         if "themes" in article_summary and article_summary["themes"] is not None:
             self._theme_repo.add_related(current_article, article_summary["themes"])
+
+    def get_search_terms_from_article(self, article):
+        if article.text.endswith("- Google Search"):
+            return article.text.split(" - Google Search")[0]
+        return None
+
+    def track_browsing(self, article, navlog):
+        search = self.get_search_terms_from_article(article)
+        browse = self._browse_repo.get_or_insert(Browse(tab_id=navlog["tabId"]))
+        if search is not None and browse.title is None:
+            browse.title = search
+        if browse.logged_at is None:
+            browse.logged_at = navlog["created_at"]
+        self._browse_repo.update(browse)
+        browsed = self._browsed_repo.get_by_browse_and_article(
+            article_id=article.id, browse_id=browse.id
+        )
+        if browsed is None:
+            self._browsed_repo.add(Browsed(article_id=article.id, browse_id=browse.id))
+        else:
+            browsed.count += 1
+            self._browsed_repo.update(browsed)
 
     def build_article_from_navlog(self, current_article, navlog):
         current_article.source_navlog = navlog["id"]

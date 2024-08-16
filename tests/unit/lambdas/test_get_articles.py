@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from get_articles import lambda_handler
-from models import Article
+from models.article import Article
 
 
 @pytest.fixture(scope="function")

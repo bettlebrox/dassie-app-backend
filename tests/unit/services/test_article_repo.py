@@ -2,7 +2,8 @@ from datetime import datetime
 from unittest.mock import MagicMock
 from urllib.parse import quote_plus
 import pytest
-from models import Article, Theme
+from models.article import Article
+from models.theme import Theme
 from repos import ArticleRepository
 from theme_repo import ThemeRepository
 
@@ -165,7 +166,7 @@ def test_upsert_article():
     )
     # Call the upsert method
     mock_session.return_value.merge.return_value = article
-    upserted_article = repo.upsert(article)
+    upserted_article = repo.get_or_insert(article)
 
     # Assert the result
     assert upserted_article.original_title == "Test Article"

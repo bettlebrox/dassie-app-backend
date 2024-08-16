@@ -5,7 +5,8 @@ from moto import mock_aws
 import boto3
 from unittest.mock import MagicMock
 from add_theme import lambda_handler
-from models import Article, Theme, ThemeType
+from models.article import Article
+from models.theme import Theme, ThemeType
 from services.openai_client import LLMResponseException
 from services.themes_service import ThemesService
 

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from get_themes import lambda_handler
 
-from models import ThemeType
+from models.theme import ThemeType
 
 
 def test_get_themes():

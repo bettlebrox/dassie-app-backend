@@ -2,7 +2,7 @@ from functools import reduce
 import logging
 from urllib.parse import quote_plus
 
-from models import Theme, ThemeType
+from models.theme import Theme, ThemeType
 from services.openai_client import LLMResponseException
 
 logger = logging.getLogger()

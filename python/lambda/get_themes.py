@@ -1,6 +1,6 @@
 import logging
 from lambda_init_context import LambdaInitContext
-from models import ThemeType
+from models.theme import ThemeType
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
