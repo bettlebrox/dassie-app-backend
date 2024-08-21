@@ -142,35 +142,6 @@ class ArticleRepository(BasePostgresRepository):
             session.commit()
             return detached
 
-    """
-    Retrieves articles that have an embedding vector similar to the provided `theme_embedding` vector.
-
-    Args:
-        theme_embedding (List[int]): A list of integers representing the embedding vector to search for.
-
-    Returns:
-        List[Article]: A list of Article objects that have an embedding vector similar to the provided `theme_embedding`.
-    """
-
-    def get_by_theme_embedding(
-        self, theme_embedding: List[int], threshold: float = 0.8, limit: int = 20
-    ):
-        with closing(self.session()) as session:
-            query = (
-                session.query(self.model)
-                .where(
-                    (1 - Article._embedding.cosine_distance(theme_embedding))
-                    > threshold
-                )
-                .order_by(Article._embedding.cosine_distance(theme_embedding).asc())
-            )
-            logger.debug(
-                "query :{}".format(
-                    query.statement.compile(compile_kwargs={"literal_binds": True})
-                )
-            )
-            return query.limit(limit).all()
-
     def get(
         self,
         limit: int = 20,
@@ -179,10 +150,6 @@ class ArticleRepository(BasePostgresRepository):
         filter_embedding=None,
         threshold: float = 0.8,
     ):
-        try:
-            sort_by_att = self.model.__dict__["_" + sort_by]
-        except KeyError:
-            sort_by_att = self.model.__dict__["_logged_at"]
         with closing(self.session()) as session:
             query = (
                 session.query(self.model)
@@ -197,20 +164,26 @@ class ArticleRepository(BasePostgresRepository):
                 if filter_embedding is not None
                 else query
             )
-            query = (
-                query.order_by(sort_by_att.desc() if descending else sort_by_att.asc())
-                if sort_by != "browse"
-                else query.join(Browsed)
-                .group_by(self.model._id)
-                .order_by(
-                    func.count(Browsed._browse_id).desc()
-                    if descending
-                    else func.count(Browsed._browse_id).asc()
-                )
-            )
+            query = self._append_sort_by(query, sort_by, descending, filter_embedding)
             query = query.options(joinedload(self.model._themes))
             logger.debug("embedding query :{}".format(query.statement.compile()))
             return query.limit(limit).all()
+
+    def _append_sort_by(self, query, sort_by, descending, filter_embedding=None):
+        if sort_by == "browse":
+            query = query.join(Browsed).group_by(self.model._id)
+            order_by_func = func.count(Browsed._browse_id)
+        elif sort_by == "embedding":
+            order_by_func = Article._embedding.cosine_distance(filter_embedding)
+        else:
+            try:
+                order_by_func = self.model.__dict__["_" + sort_by]
+            except KeyError:
+                order_by_func = self.model.__dict__["_logged_at"]
+        query = query.order_by(
+            order_by_func.desc() if descending else order_by_func.asc()
+        )
+        return query
 
     def get_last_7days(self):
         return self.get(days=7)

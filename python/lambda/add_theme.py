@@ -51,7 +51,7 @@ def lambda_handler(
             response["statusCode"] = 400
             return response
         embedding = openai_client.get_embedding(title)
-        related = article_repo.get_by_theme_embedding(embedding)
+        related = article_repo.get(filter_embedding=embedding)
         theme = theme_service.build_theme_from_related_articles(
             related, ThemeType.CUSTOM, title, embedding
         )

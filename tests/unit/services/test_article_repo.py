@@ -23,7 +23,7 @@ def article_repo(mock_session):
 
 
 @pytest.fixture
-def article_repo_query(article_repo):
+def mock_query(article_repo):
     mock_query = MagicMock()
     mock_session = MagicMock()
     mock_session.return_value.query.return_value = mock_query
@@ -32,36 +32,32 @@ def article_repo_query(article_repo):
 
 
 @pytest.fixture
-def article_repo_get_query(article_repo_query):
-    return article_repo_query.options.return_value.options.return_value.order_by
+def mock_simple_order_by(mock_query):
+    return mock_query.options.return_value.options.return_value.order_by
 
 
 @pytest.fixture
-def article_repo_limit_query(article_repo_get_query):
-    return article_repo_get_query.return_value.options.return_value.limit
+def mock_simple_limit(mock_simple_order_by):
+    return mock_simple_order_by.return_value.options.return_value.limit
 
 
 @pytest.fixture
-def article_repo_where_query(article_repo_query):
-    return article_repo_query.options.return_value.options.return_value.where
+def mock_where(mock_query):
+    return mock_query.options.return_value.options.return_value.where
 
 
-def test_get_articles(article_repo, article_repo_get_query):
+def test_get_articles(article_repo, mock_simple_order_by):
     article_repo.get()
-    assert article_repo_get_query.call_args is not None, "order_by should be called"
-    assert Article._logged_at.desc().compare(article_repo_get_query.call_args[0][0])
+    assert mock_simple_order_by.call_args is not None, "order_by should be called"
+    assert Article._logged_at.desc().compare(mock_simple_order_by.call_args[0][0])
 
 
-def test_get_articles_by_created_at(article_repo, article_repo_get_query):
+def test_get_articles_by_created_at(article_repo, mock_simple_order_by):
     article_repo.get(sort_by="created_at")
-    assert Article._created_at.desc().compare(article_repo_get_query.call_args[0][0])
+    assert Article._created_at.desc().compare(mock_simple_order_by.call_args[0][0])
 
 
-def test_get_articles_by_theme(article_repo, article_repo_query):
-    # Create a mock session and query
-    mock_query = MagicMock()
-    mock_session = MagicMock()
-    mock_session.return_value.query.return_value = mock_query
+def test_get_articles_by_theme(article_repo, mock_where):
     query_embedding = [
         -0.023027408868074417,
         0.012609250843524933,
@@ -75,13 +71,16 @@ def test_get_articles_by_theme(article_repo, article_repo_query):
         )
         for _ in range(10)
     ]
-    article_repo_query.where.return_value.order_by.return_value.limit.return_value.all.return_value = (
+    mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
         articles
     )
-    articles = article_repo.get_by_theme_embedding(query_embedding)
+    articles = article_repo.get(filter_embedding=query_embedding, sort_by="embedding")
     assert len(articles) > 0
-    assert article_repo_query.where.call_args[0][0].compare(
+    assert mock_where.call_args[0][0].compare(
         (1 - Article._embedding.cosine_distance(query_embedding)) > 0.8
+    )
+    assert mock_where.return_value.order_by.call_args[0][0].compare(
+        Article._embedding.cosine_distance(query_embedding).desc()
     )
 
 
@@ -114,44 +113,44 @@ def test_enhance_article():
     assert enhanced_article.embedding == embedding
 
 
-def test_get_articles_with_custom_limit(article_repo, article_repo_get_query):
-    limit_mock = article_repo_get_query.return_value.options.return_value.limit
+def test_get_articles_with_custom_limit(article_repo, mock_simple_order_by):
+    limit_mock = mock_simple_order_by.return_value.options.return_value.limit
     article_repo.get(limit=50)
     limit_mock.assert_called_with(50)
 
 
-def test_get_articles_with_custom_sort_by(article_repo, article_repo_get_query):
+def test_get_articles_with_custom_sort_by(article_repo, mock_simple_order_by):
     article_repo.get(sort_by="title")
-    assert Article._title.desc().compare(article_repo_get_query.call_args[0][0])
+    assert Article._title.desc().compare(mock_simple_order_by.call_args[0][0])
 
 
-def test_get_articles_ascending_order(article_repo, article_repo_get_query):
+def test_get_articles_ascending_order(article_repo, mock_simple_order_by):
     article_repo.get(descending=False)
-    assert Article._logged_at.asc().compare(article_repo_get_query.call_args[0][0])
+    assert Article._logged_at.asc().compare(mock_simple_order_by.call_args[0][0])
 
 
-def test_get_articles_invalid_sort_by(article_repo, article_repo_get_query):
+def test_get_articles_invalid_sort_by(article_repo, mock_simple_order_by):
     article_repo.get(sort_by="invalid_field")
-    assert Article._logged_at.desc().compare(article_repo_get_query.call_args[0][0])
+    assert Article._logged_at.desc().compare(mock_simple_order_by.call_args[0][0])
 
 
-def test_get_articles_empty_result(article_repo, article_repo_get_query):
-    article_repo_get_query.return_value.limit.return_value.all.return_value = []
+def test_get_articles_empty_result(article_repo, mock_simple_order_by):
+    mock_simple_order_by.return_value.limit.return_value.all.return_value = []
     result = article_repo.get()
     assert len(result) == 0
 
 
-def test_get_articles_exception_handling(article_repo, article_repo_query):
-    article_repo_query.options.side_effect = Exception("Database error")
+def test_get_articles_exception_handling(article_repo, mock_query):
+    mock_query.options.side_effect = Exception("Database error")
     with pytest.raises(Exception):
         article_repo.get()
 
 
-def test_get_articles_with_embedding(article_repo, article_repo_where_query):
+def test_get_articles_with_embedding(article_repo, mock_where):
     embedding = [0.1, 0.2, 0.3]
     article_repo.get(filter_embedding=embedding, threshold=0.7)
 
-    article_repo_where_query.assert_called()
+    mock_where.assert_called()
 
 
 def test_upsert_article():
@@ -339,59 +338,53 @@ def test_get_all_articles():
     assert articles[1]._title == quote_plus("Test Article 2")
 
 
-def test_get_default_params(
-    article_repo, article_repo_get_query, article_repo_limit_query
-):
+def test_get_default_params(article_repo, mock_simple_order_by, mock_simple_limit):
 
-    article_repo_limit_query.return_value.all.return_value = [
+    mock_simple_limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
     result = article_repo.get()
 
     assert len(result) == 1
-    article_repo_get_query.assert_called_once()
-    article_repo_limit_query.assert_called_once_with(20)
+    mock_simple_order_by.assert_called_once()
+    mock_simple_limit.assert_called_once_with(20)
 
 
-def test_get_with_custom_params(
-    article_repo, article_repo_get_query, article_repo_limit_query
-):
-    article_repo_limit_query.return_value.all.return_value = [
+def test_get_with_custom_params(article_repo, mock_simple_order_by, mock_simple_limit):
+    mock_simple_limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(limit=10, sort_by="title", descending=False)
 
     assert len(result) == 1
-    article_repo_get_query.assert_called_once()
-    article_repo_limit_query.assert_called_once_with(10)
+    mock_simple_order_by.assert_called_once()
+    mock_simple_limit.assert_called_once_with(10)
 
 
-def test_get_with_embedding_filter(
-    article_repo, article_repo_where_query, article_repo_query
-):
-    article_repo_where_query.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
+def test_get_with_embedding_filter(article_repo, mock_where, mock_query):
+    mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(filter_embedding=[0.1, 0.2, 0.3], threshold=0.9)
 
     assert len(result) == 1
-    article_repo_where_query.assert_called_once()
-    article_repo_where_query.return_value.order_by.return_value.options.return_value.limit.assert_called_once_with(
+    mock_where.assert_called_once()
+    mock_where.return_value.order_by.return_value.options.return_value.limit.assert_called_once_with(
         20
     )
 
 
-def test_get_sort_by_browses(article_repo, article_repo_query):
-    article_repo_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
+def test_get_sort_by_browses(article_repo, mock_query):
+    mock_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(sort_by="browse")
 
     assert len(result) == 1
-    assert article_repo_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.call_args[
+    assert mock_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.call_args[
         0
     ][
         0

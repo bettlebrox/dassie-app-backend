@@ -6,7 +6,6 @@ import boto3
 import json
 import os
 import logging
-import weave
 from services.themes_service import ThemesService
 
 logger = logging.getLogger()
