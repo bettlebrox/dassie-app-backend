@@ -2,15 +2,24 @@ from datetime import datetime
 from unittest.mock import MagicMock
 from urllib.parse import quote_plus
 import pytest
+from sqlalchemy import func
 from models.article import Article
+from models.models import Browsed
 from models.theme import Theme
 from repos import ArticleRepository
 from theme_repo import ThemeRepository
 
 
 @pytest.fixture
-def article_repo():
-    return ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
+def mock_session():
+    return MagicMock()
+
+
+@pytest.fixture
+def article_repo(mock_session):
+    repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
+    repo.session = mock_session
+    return repo
 
 
 @pytest.fixture
@@ -24,7 +33,14 @@ def article_repo_query(article_repo):
 
 @pytest.fixture
 def article_repo_get_query(article_repo_query):
-    return article_repo_query.options.return_value.order_by
+    return article_repo_query.options.return_value.group_by.return_value.order_by
+
+
+@pytest.fixture
+def article_repo_where_query(article_repo_query):
+    return (
+        article_repo_query.where.return_value.options.return_value.group_by.return_value.order_by
+    )
 
 
 def test_get_articles(article_repo, article_repo_get_query):
@@ -325,3 +341,75 @@ def test_get_all_articles():
     # Assert the result
     assert articles[0]._title == quote_plus("Test Article 1")
     assert articles[1]._title == quote_plus("Test Article 2")
+
+
+def test_get_default_params(article_repo, article_repo_get_query):
+
+    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+        Article("the aul article", "https://example.com", "This is a test article")
+    ]
+    result = article_repo.get()
+
+    assert len(result) == 1
+    article_repo_get_query.assert_called_once()
+    article_repo_get_query.return_value.limit.assert_called_once_with(20)
+
+
+def test_get_with_custom_params(article_repo, article_repo_get_query):
+    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+        Article("the aul article", "https://example.com", "This is a test article")
+    ]
+
+    result = article_repo.get(limit=10, sort_by="title", descending=False)
+
+    assert len(result) == 1
+    article_repo_get_query.assert_called_once()
+    article_repo_get_query.return_value.limit.assert_called_once_with(10)
+
+
+def test_get_with_embedding_filter(
+    article_repo, article_repo_where_query, article_repo_query
+):
+    article_repo_where_query.return_value.limit.return_value.all.return_value = [
+        Article("the aul article", "https://example.com", "This is a test article")
+    ]
+
+    result = article_repo.get(filter_embedding=[0.1, 0.2, 0.3], threshold=0.9)
+
+    assert len(result) == 1
+    article_repo_query.where.assert_called_once()
+    article_repo_where_query.assert_called_once()
+    article_repo_where_query.return_value.limit.assert_called_once_with(20)
+
+
+def test_get_sort_by_browses(article_repo, article_repo_get_query):
+    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+        Article("the aul article", "https://example.com", "This is a test article")
+    ]
+
+    result = article_repo.get(sort_by="browse")
+
+    assert len(result) == 1
+    assert (
+        func.count(Browsed.browse_id)
+        .desc()
+        .compare(article_repo_get_query.call_args[0][0])
+    )
+    article_repo_get_query.limit.assert_called_once_with(20)
+    article_repo_get_query.return_value.limit.assert_called_once_with(20)
+
+
+def test_get_invalid_sort_by(article_repo, mock_session):
+    mock_query = mock_session.return_value.query.return_value
+    mock_query.options.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
+    mock_query.limit.return_value.all.return_value = [
+        Article("the aul article", "https://example.com", "This is a test article")
+    ]
+
+    result = article_repo.get(sort_by="invalid_field")
+
+    assert len(result) == 1
+    mock_session.return_value.query.assert_called_once_with(Article)
+    mock_query.order_by.assert_called_once()
+    mock_query.limit.assert_called_once_with(20)

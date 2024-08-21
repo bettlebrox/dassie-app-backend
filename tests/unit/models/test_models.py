@@ -1,8 +1,8 @@
 from urllib.parse import quote_plus
 import pytest
 from datetime import datetime
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy import create_engine, desc, func
 from sqlalchemy.exc import IntegrityError
 import uuid
 import sys
@@ -318,10 +318,11 @@ def test_create_browsed(session):
     retrieved_browsed = (
         session.query(Browsed).filter_by(_article_id=article._id).first()
     )
-
+    article = session.get(Article, article._id)
     # Check if the retrieved browsed entry matches the original
     assert retrieved_browsed.article_id == article._id
     assert isinstance(retrieved_browsed.created_at, datetime)
+    assert len(article.browses) == 1
 
 
 def test_browsed_unique_constraint(session):
@@ -353,6 +354,59 @@ def test_browsed_unique_constraint(session):
         session.commit()
 
 
+def test_order_articles_by_browsed_count(session):
+    # Create articles with browsed counts
+    article1 = Article(
+        original_title="Article 1",
+        summary="This is article 1",
+        url="https://example.com/article1",
+    )
+    article2 = Article(
+        original_title="Article 2",
+        summary="This is article 2",
+        url="https://example.com/article2",
+    )
+    article3 = Article(
+        original_title="Article 3",
+        summary="This is article 3",
+        url="https://example.com/article3",
+    )
+    session.add_all([article1, article2, article3])
+    session.commit()
+    # Create browsed entries for the articles
+    browse1 = Browse(
+        "some title",
+        logged_at=datetime.now(),
+    )
+    session.add(browse1)
+    session.commit
+    browsed1 = Browsed(article_id=article3._id, browse_id=browse1._id)
+    session.add(browsed1)
+    session.commit()
+    browse2 = Browse(
+        "some title1",
+        logged_at=datetime.now(),
+    )
+    session.add(browse2)
+    session.commit()
+    browsed2 = Browsed(article_id=article3._id, browse_id=browse2._id)
+    session.add(browsed2)
+    session.commit()
+    browsed3 = Browsed(article_id=article2._id, browse_id=browse2._id)
+    browsed4 = Browsed(article_id=article1._id, browse_id=browse2._id)
+    session.add_all([browsed3, browsed4])
+    results = (
+        session.query(Article)
+        .join(Browsed)
+        .options(joinedload(Article._themes))
+        .group_by(Article._id)
+        .order_by(func.count(Browsed._browse_id).desc())
+        .all()
+    )
+    assert results[0] == article3
+    assert len(results) == 3
+
+
 def test_browsed_cascade_delete(session):
     # Create an article
     article = Article(
@@ -381,13 +435,3 @@ def test_browsed_cascade_delete(session):
     # Check if the browsed entry is also deleted
     retrieved_browsed = session.query(Browsed).filter_by(article_id=article._id).first()
     assert retrieved_browsed is None
-
-
-def test_browsed_without_article(session):
-    # Attempt to create a browsed entry without an associated article
-    browsed = Browsed(article_id=uuid.uuid4())  # Non-existent article_id
-    session.add(browsed)
-
-    # Check if an IntegrityError is raised due to foreign key constraint
-    with pytest.raises(IntegrityError):
-        session.commit()

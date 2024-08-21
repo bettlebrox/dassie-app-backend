@@ -30,7 +30,7 @@ def test_build_article():
     browse = Browse(tab_id="12234")
     browse._id = 1
     browse_repo.upsert.return_value = browse
-    browsed_repo.get.return_value = None
+    browsed_repo.get_by_browse_and_article.return_value = None
     # action
     article = articles_service.build_article_from_navlog(article, navlog)
     articles_service.track_browsing(article, navlog)

@@ -203,3 +203,38 @@ def test_get_articles_empty_result(article_repo, openai_client):
     )
     assert response["statusCode"] == 200
     assert response["body"] == "[]"
+
+
+def test_get_articles_with_filter_embedding(article_repo, openai_client):
+    event = {"path": "/articles"}
+    context = {}
+    test_article = Article("test article", "https://example.com")
+    article_repo.get.return_value = [test_article]
+    response = lambda_handler(
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
+    )
+    assert response["statusCode"] == 200
+    assert response["body"] == f"[{test_article.json()}]"
+
+
+def test_get_articles_by_browse(article_repo, openai_client):
+    event = {
+        "path": "/articles",
+        "queryStringParameters": {"sortField": "browse"},
+    }
+    context = {}
+    test_article = Article("test article", "https://example.com")
+    article_repo.get.return_value = [test_article]
+    response = lambda_handler(
+        event,
+        context,
+        article_repo=article_repo,
+        openai_client=openai_client,
+        useGlobal=False,
+    )
+    assert response["statusCode"] == 200
+    assert response["body"] == f"[{test_article.json()}]"

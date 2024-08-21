@@ -3,7 +3,6 @@ from theme_repo import ThemeRepository
 from models.article import Article
 from repos import (
     ArticleRepository,
-    BasePostgresRepository,
     BrowseRepository,
     BrowsedRepository,
 )

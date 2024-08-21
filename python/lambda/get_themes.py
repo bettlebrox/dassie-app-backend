@@ -35,7 +35,6 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
             if theme is not None:
                 response["body"] = theme.json(related=True)
                 return response
-
         # return all themes
         if sort_field == "count_association":
             result = theme_repo.get_top(max, source)

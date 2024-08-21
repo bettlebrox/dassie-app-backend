@@ -22,7 +22,12 @@ class Browsed(Base):
     _article_id = Column(
         UUID(as_uuid=True), ForeignKey("article._id"), primary_key=True
     )
-    _browse_id = Column(UUID(as_uuid=True), ForeignKey("browse._id"), primary_key=True)
+    _browse_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("browse._id"),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
     _count = Column(Integer, default=1)
     _time = Column(Integer, default=0)
     _created_at = Column(DateTime, default=datetime.now())
@@ -128,7 +133,7 @@ class Browse(Base):
     _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _logged_at = Column(DateTime, index=True)
     _tab_id = Column(String, index=True, unique=True)
-    _articles = relationship("Article", secondary="browsed")
+    _articles = relationship("Article", secondary="browsed", back_populates="_browses")
 
     def __init__(self, tab_id, title=None, logged_at=None):
         self._tab_id = tab_id
@@ -170,3 +175,16 @@ class Browse(Base):
     @property
     def articles(self):
         return self._articles
+
+    def json(self, dump=True):
+        json_obj = {
+            "id": str(self._id),
+            "title": self._title,
+            "created_at": self._created_at.isoformat(),
+            "updated_at": self._updated_at.isoformat(),
+            "logged_at": self._logged_at.isoformat(),
+            "tab_id": self._tab_id,
+        }
+        if dump:
+            return json.dumps(json_obj)
+        return json_obj

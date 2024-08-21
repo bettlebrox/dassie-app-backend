@@ -4,10 +4,14 @@ from services.themes_service import ThemesService
 
 
 import boto3
-
+import logging
 
 import json
 import os
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 
 from theme_repo import ThemeRepository
 
@@ -15,6 +19,7 @@ from theme_repo import ThemeRepository
 class LambdaInitContext:
     OPENAI_SECRET_KEY = "OPENAI_API_KEY"
     LANGFUSE_SECRET_KEY = "langfuse_secret_key"
+    DB_NAME = "dassie"
 
     def __init__(
         self,
@@ -41,11 +46,12 @@ class LambdaInitContext:
     @property
     def db_secrets(self):
         if self._db_secrets is None:
+            logger.info(f"Fetching db secret: {os.environ['DB_SECRET_ARN']}")
             get_secret_value_response = self.secrets_manager.get_secret_value(
                 SecretId=os.environ["DB_SECRET_ARN"]
             )
             secret = json.loads(get_secret_value_response["SecretString"])
-            self._db_secrets = secret["username"], secret["password"], secret["dbname"]
+            self._db_secrets = secret["username"], secret["password"], "dassie"
         return self._db_secrets
 
     @property

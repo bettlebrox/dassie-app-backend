@@ -1,7 +1,7 @@
 import json
 from os import path
 import os
-from aws_cdk import Fn, Stack, CfnOutput, Duration
+from aws_cdk import Stack, CfnOutput, Duration
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_lambda_python_alpha as lambda_python
@@ -13,7 +13,6 @@ import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
 import aws_cdk.aws_logs_destinations as destinations
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
-import aws_cdk.aws_cognito as cognito
 import aws_cdk.aws_iam as iam
 
 
@@ -86,16 +85,37 @@ class PythonStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
         vpc = ec2.Vpc(self, "AuroraVpc1")
-        sql_db = rds.ServerlessCluster(
+        sql_db = rds.DatabaseCluster(
             self,
-            "dassie",
+            "dassie1",
             engine=rds.DatabaseClusterEngine.aurora_postgres(
-                version=rds.AuroraPostgresEngineVersion.VER_13_12
+                version=rds.AuroraPostgresEngineVersion.VER_16_1
             ),
+            serverless_v2_max_capacity=16,
+            serverless_v2_min_capacity=1,
             vpc=vpc,
-            enable_data_api=True,
-            default_database_name="dassie",
+            writer=rds.ClusterInstance.serverless_v2(
+                "writer", enable_performance_insights=True
+            ),
+            readers=[
+                rds.ClusterInstance.serverless_v2(
+                    "reader", enable_performance_insights=True
+                )
+            ],
+            storage_encrypted=True,
+            monitoring_interval=Duration.seconds(60),
+            monitoring_role=iam.Role.from_role_arn(
+                self,
+                "monitoring-role",
+                "arn:aws:iam::559845934392:role/emaccess",
+            ),
         )
+        bastion = ec2.SecurityGroup.from_security_group_id(
+            self,
+            "bastion",
+            security_group_id="sg-0669c97cc65247ecd",
+        )
+        sql_db.connections.allow_default_port_from(bastion)
         ddb = dynamodb.Table(
             self,
             "navlogDB",
@@ -125,6 +145,12 @@ class PythonStack(Stack):
             "RequirementsLayerExtended1",
             layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:3",
         )
+        nr_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self,
+            "NewRelicLayer",
+            layer_version_arn="arn:aws:lambda:eu-west-1:451483290750:layer:NewRelicPython39:70",
+        )
+
         nr_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
             "nr_license_key",
@@ -140,6 +166,15 @@ class PythonStack(Stack):
             "langfuse_secret_key",
             secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
         )
+        lambdas_env = {
+            "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
+            "DB_SECRET_ARN": sql_db.secret.secret_arn,
+            "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
+            "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
+            "NEW_RELIC_LAMBDA_EXTENSION_ENABLED": "false",
+            "DDB_TABLE": ddb.table_name,
+            "BUCKET_NAME": bucket.bucket_name,
+        }
         getThemes = lambda_.Function(
             self,
             "getThemes",
@@ -147,12 +182,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_themes.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
             security_groups=sql_db.connections.security_groups,
-            environment={
-                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-                "DB_SECRET_ARN": sql_db.secret.secret_arn,
-            },
+            environment=lambdas_env,
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
         )
@@ -168,14 +200,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_articles.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
             security_groups=sql_db.connections.security_groups,
-            environment={
-                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-                "DB_SECRET_ARN": sql_db.secret.secret_arn,
-                "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
-                "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
-            },
+            environment=lambdas_env,
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
         )
@@ -193,14 +220,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
             security_groups=sql_db.connections.security_groups,
-            environment={
-                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-                "DB_SECRET_ARN": sql_db.secret.secret_arn,
-                "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
-                "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
-            },
+            environment=lambdas_env,
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
         )
@@ -218,12 +240,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
             security_groups=sql_db.connections.security_groups,
-            environment={
-                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-                "DB_SECRET_ARN": sql_db.secret.secret_arn,
-            },
+            environment=lambdas_env,
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
         )
@@ -239,12 +258,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_related.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
             security_groups=sql_db.connections.security_groups,
-            environment={
-                "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-                "DB_SECRET_ARN": sql_db.secret.secret_arn,
-            },
+            environment=lambdas_env,
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(45),
         )
@@ -272,10 +288,7 @@ class PythonStack(Stack):
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.ACTIVE,
             timeout=Duration.seconds(5),
-            environment={
-                "DDB_TABLE": ddb.table_name,
-                "BUCKET_NAME": bucket.bucket_name,
-            },
+            environment=lambdas_env,
         )
         ddb.grant_read_write_data(addNavlog)
         bucket.grant_read_write(addNavlog)

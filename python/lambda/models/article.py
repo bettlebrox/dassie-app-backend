@@ -20,6 +20,7 @@ class Article(Base):
     _token_count = Column(Integer)
     _text = Column(String)
     _themes = relationship("Theme", secondary="association", back_populates="_related")
+    _browses = relationship("Browse", secondary="browsed", back_populates="_articles")
     _embedding = Column(Vector(1536))
     _image = Column(String)
     _source_navlog = Column(String)
@@ -55,12 +56,19 @@ class Article(Base):
             "updated_at": (
                 "" if self._updated_at is None else self._updated_at.isoformat()
             ),
-            "text": "" if self._text is None else self._text,
             "source": self._source_navlog,
             "image": self._image,
             "themes": [theme.json(dump=False) for theme in self._themes],
         }
         return json.dumps(json_obj) if dump else json_obj
+
+    @property
+    def browses(self):
+        return self._browses
+
+    @browses.setter
+    def browses(self, value):
+        self._browses = value
 
     @property
     def id(self):

@@ -1,10 +1,10 @@
 from contextlib import closing
 from typing import List
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from models.models import Association, Browse, Browsed
 from models.article import Article
 from models.theme import Theme
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.orm import sessionmaker, joinedload, defer
 import logging
 
 logger = logging.getLogger()
@@ -184,7 +184,11 @@ class ArticleRepository(BasePostgresRepository):
         except KeyError:
             sort_by_att = self.model.__dict__["_logged_at"]
         with closing(self.session()) as session:
-            query = session.query(self.model)
+            query = (
+                session.query(self.model)
+                .options(defer(Article._embedding))
+                .options(defer(Article._text))
+            )
             query = (
                 query.where(
                     (1 - Article._embedding.cosine_distance(filter_embedding))
@@ -193,15 +197,20 @@ class ArticleRepository(BasePostgresRepository):
                 if filter_embedding is not None
                 else query
             )
-            logger.info("embedding query :{}".format(query.statement.compile()))
-            return (
-                query.options(
-                    joinedload(self.model._themes),
+            query = (
+                query.order_by(sort_by_att.desc() if descending else sort_by_att.asc())
+                if sort_by != "browse"
+                else query.join(Browsed)
+                .group_by(self.model._id)
+                .order_by(
+                    func.count(Browsed._browse_id).desc()
+                    if descending
+                    else func.count(Browsed._browse_id).asc()
                 )
-                .order_by(sort_by_att.desc() if descending else sort_by_att.asc())
-                .limit(limit)
-                .all()
             )
+            query = query.options(joinedload(self.model._themes))
+            logger.debug("embedding query :{}".format(query.statement.compile()))
+            return query.limit(limit).all()
 
     def get_last_7days(self):
         return self.get(days=7)

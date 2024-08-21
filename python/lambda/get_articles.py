@@ -2,7 +2,7 @@ import logging
 from lambda_init_context import LambdaInitContext
 
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 VALID_SORT_ORDERS = ["asc", "desc"]
 VALID_SORT_FIELDS = [
@@ -11,6 +11,7 @@ VALID_SORT_FIELDS = [
     "created_at",
     "logged_at",
     "count_association",
+    "browse",
 ]
 init_context = None
 
