@@ -10,8 +10,9 @@ def test_build_article():
     themes_repo = MagicMock()
     browse_repo = MagicMock()
     browsed_repo = MagicMock()
+    llm_client = MagicMock()
     articles_service = ArticlesService(
-        articles_repo, themes_repo, browse_repo, browsed_repo
+        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
     )
     navlog = {
         "id": "1",
@@ -32,9 +33,64 @@ def test_build_article():
     browse_repo.upsert.return_value = browse
     browsed_repo.get_by_browse_and_article.return_value = None
     # action
-    article = articles_service.build_article_from_navlog(article, navlog)
-    articles_service.track_browsing(article, navlog)
+    article = articles_service._build_article_from_navlog(article, navlog)
+    articles_service._track_browsing(article, navlog)
     # assert
     assert article.text == navlog["body_text"]
     assert article.source_navlog == navlog["id"]
     browsed_repo.add.assert_called_once()
+
+
+def test_build_article_from_navlog_without_existing_article():
+    articles_repo = MagicMock()
+    themes_repo = MagicMock()
+    browse_repo = MagicMock()
+    browsed_repo = MagicMock()
+    llm_client = MagicMock()
+    articles_service = ArticlesService(
+        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
+    )
+    navlog = {
+        "id": "2",
+        "title": "Navlog 2",
+        "body_text": "This is another test article body",
+        "created_at": "2022-02-01T00:00:00.00",
+        "logged_at": "2022-02-01T00:00:00.00",
+        "tabId": "56789",
+    }
+    new_article = articles_service._build_article_from_navlog(
+        Article(original_title="Test Article 2", url="https://example.org"), navlog
+    )
+    assert articles_repo.update.calledWith(new_article)
+
+
+def test_track_browsing_with_existing_browsed():
+    articles_repo = MagicMock()
+    themes_repo = MagicMock()
+    browse_repo = MagicMock()
+    browsed_repo = MagicMock()
+    llm_client = MagicMock()
+    articles_service = ArticlesService(
+        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
+    )
+    article = Article(original_title="Test Article 2", url="https://example.org")
+    article._id = 2
+    navlog = {
+        "id": "3",
+        "title": "Navlog 3",
+        "body_text": "This is a third test article body",
+        "created_at": "2022-03-01T00:00:00.00",
+        "logged_at": "2022-03-01T00:00:00.00",
+        "tabId": "98765",
+    }
+    browse = Browse(tab_id="98765")
+    browse._id = 2
+    browse_repo.get_or_insert.return_value = browse
+    existing_browsed = MagicMock()
+    browsed_repo.get_by_browse_and_article.return_value = existing_browsed
+
+    articles_service._track_browsing(article, navlog)
+
+    browse_repo.get_or_insert.assert_called_once()
+    browsed_repo.get_by_browse_and_article.assert_called_once()
+    browsed_repo.update.assert_called_once()

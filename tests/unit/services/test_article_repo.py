@@ -33,14 +33,17 @@ def article_repo_query(article_repo):
 
 @pytest.fixture
 def article_repo_get_query(article_repo_query):
-    return article_repo_query.options.return_value.group_by.return_value.order_by
+    return article_repo_query.options.return_value.options.return_value.order_by
+
+
+@pytest.fixture
+def article_repo_limit_query(article_repo_get_query):
+    return article_repo_get_query.return_value.options.return_value.limit
 
 
 @pytest.fixture
 def article_repo_where_query(article_repo_query):
-    return (
-        article_repo_query.where.return_value.options.return_value.group_by.return_value.order_by
-    )
+    return article_repo_query.options.return_value.options.return_value.where
 
 
 def test_get_articles(article_repo, article_repo_get_query):
@@ -112,7 +115,7 @@ def test_enhance_article():
 
 
 def test_get_articles_with_custom_limit(article_repo, article_repo_get_query):
-    limit_mock = article_repo_get_query.return_value.limit
+    limit_mock = article_repo_get_query.return_value.options.return_value.limit
     article_repo.get(limit=50)
     limit_mock.assert_called_with(50)
 
@@ -144,18 +147,11 @@ def test_get_articles_exception_handling(article_repo, article_repo_query):
         article_repo.get()
 
 
-def test_get_articles_with_embedding():
-    mock_session = MagicMock()
-    mock_query = MagicMock()
-    mock_session.return_value.query.return_value = mock_query
-
-    repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
-
+def test_get_articles_with_embedding(article_repo, article_repo_where_query):
     embedding = [0.1, 0.2, 0.3]
-    repo.get(filter_embedding=embedding, threshold=0.7)
+    article_repo.get(filter_embedding=embedding, threshold=0.7)
 
-    mock_query.where.assert_called()
+    article_repo_where_query.assert_called()
 
 
 def test_upsert_article():
@@ -343,20 +339,24 @@ def test_get_all_articles():
     assert articles[1]._title == quote_plus("Test Article 2")
 
 
-def test_get_default_params(article_repo, article_repo_get_query):
+def test_get_default_params(
+    article_repo, article_repo_get_query, article_repo_limit_query
+):
 
-    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+    article_repo_limit_query.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
     result = article_repo.get()
 
     assert len(result) == 1
     article_repo_get_query.assert_called_once()
-    article_repo_get_query.return_value.limit.assert_called_once_with(20)
+    article_repo_limit_query.assert_called_once_with(20)
 
 
-def test_get_with_custom_params(article_repo, article_repo_get_query):
-    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+def test_get_with_custom_params(
+    article_repo, article_repo_get_query, article_repo_limit_query
+):
+    article_repo_limit_query.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
@@ -364,39 +364,40 @@ def test_get_with_custom_params(article_repo, article_repo_get_query):
 
     assert len(result) == 1
     article_repo_get_query.assert_called_once()
-    article_repo_get_query.return_value.limit.assert_called_once_with(10)
+    article_repo_limit_query.assert_called_once_with(10)
 
 
 def test_get_with_embedding_filter(
     article_repo, article_repo_where_query, article_repo_query
 ):
-    article_repo_where_query.return_value.limit.return_value.all.return_value = [
+    article_repo_where_query.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(filter_embedding=[0.1, 0.2, 0.3], threshold=0.9)
 
     assert len(result) == 1
-    article_repo_query.where.assert_called_once()
     article_repo_where_query.assert_called_once()
-    article_repo_where_query.return_value.limit.assert_called_once_with(20)
+    article_repo_where_query.return_value.order_by.return_value.options.return_value.limit.assert_called_once_with(
+        20
+    )
 
 
-def test_get_sort_by_browses(article_repo, article_repo_get_query):
-    article_repo_get_query.return_value.limit.return_value.all.return_value = [
+def test_get_sort_by_browses(article_repo, article_repo_query):
+    article_repo_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(sort_by="browse")
 
     assert len(result) == 1
-    assert (
-        func.count(Browsed.browse_id)
-        .desc()
-        .compare(article_repo_get_query.call_args[0][0])
+    assert article_repo_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.call_args[
+        0
+    ][
+        0
+    ].compare(
+        func.count(Browsed._browse_id).desc()
     )
-    article_repo_get_query.limit.assert_called_once_with(20)
-    article_repo_get_query.return_value.limit.assert_called_once_with(20)
 
 
 def test_get_invalid_sort_by(article_repo, mock_session):

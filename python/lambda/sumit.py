@@ -59,37 +59,18 @@ def main():
         os.environ["OPENAI_API_KEY"], os.environ["LANGFUSE_KEY"]
     )
     article_service = ArticlesService(
-        article_repo, theme_repo, browse_repo, browsed_repo
+        article_repo, theme_repo, browse_repo, browsed_repo, openai_client
     )
     for navlog in tqdm(navlogs, total=len(navlogs)):
         try:
-            body = navlog["body_text"]
             if (
-                len(body) < 100
+                len(navlog["body_text"]) < 100
                 or "url" not in navlog
                 or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
                 < datetime.now() - timedelta(days=90)
             ):
                 continue
-            article = article_repo.get_or_insert(
-                Article(
-                    navlog["title"],
-                    navlog["url"],
-                    text=body,
-                )
-            )
-            if article.summary == "" or article.created_at < datetime.now() - timedelta(
-                days=90
-            ):
-                article = article_service.build_article_from_navlog(article, navlog)
-                article_service.add_llm_summarisation(
-                    article,
-                    openai_client.get_article_summarization(article.text),
-                    openai_client.get_embedding(article.text),
-                    openai_client.count_tokens(article.text),
-                )
-                logger.info("Built article {}".format(article.title))
-            article_service.track_browsing(article, navlog)
+            article_service.process_navlog(navlog)
         except Exception as error:
             logger.error(f"{error} navlog:{navlog}", exc_info=True)
 

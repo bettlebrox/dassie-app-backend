@@ -1,19 +1,47 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from models.models import Browse, Browsed
+from models.article import Article
 
 logger = logging.getLogger()
 
 
 class ArticlesService:
-    def __init__(self, article_repo, theme_repo, browse_repo, browsed_repo):
+    # threshold for regenerating a summary
+    STALE_ARTICLE_THRESHOLD = 90
+
+    def __init__(
+        self, article_repo, theme_repo, browse_repo, browsed_repo, openai_client
+    ):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
         self._browse_repo = browse_repo
         self._browsed_repo = browsed_repo
+        self._llm_client = openai_client
 
-    def add_llm_summarisation(
+    def process_navlog(self, navlog):
+        article = self._article_repo.get_or_insert(
+            Article(
+                navlog["title"],
+                navlog["url"],
+                text=navlog["body_text"],
+            )
+        )
+        if article.summary == "" or article.created_at < datetime.now() - timedelta(
+            days=self.STALE_ARTICLE_THRESHOLD
+        ):
+            article = self._build_article_from_navlog(article, navlog)
+            self._add_llm_summarisation(
+                article,
+                self._llm_client.get_article_summarization(article.text),
+                self._llm_client.get_embedding(article.text),
+                self._llm_client.count_tokens(article.text),
+            )
+            logger.info("Built article {}".format(article.title))
+        self._track_browsing(article, navlog)
+
+    def _add_llm_summarisation(
         self, current_article, article_summary, embedding, token_count
     ):
         if article_summary is None:
@@ -29,11 +57,11 @@ class ArticlesService:
             self._theme_repo.add_related(current_article, article_summary["themes"])
 
     def get_search_terms_from_article(self, article):
-        if article.text.endswith("- Google Search"):
-            return article.text.split(" - Google Search")[0]
+        if article.title.endswith("- Google Search"):
+            return article.title.split(" - Google Search")[0]
         return None
 
-    def track_browsing(self, article, navlog):
+    def _track_browsing(self, article, navlog):
         search = self.get_search_terms_from_article(article)
         browse = self._browse_repo.get_or_insert(Browse(tab_id=navlog["tabId"]))
         if search is not None and browse.title is None:
@@ -50,7 +78,7 @@ class ArticlesService:
             browsed.count += 1
             self._browsed_repo.update(browsed)
 
-    def build_article_from_navlog(self, current_article, navlog):
+    def _build_article_from_navlog(self, current_article, navlog):
         current_article.source_navlog = navlog["id"]
         current_article.tab_id = navlog["tabId"]
         current_article.document_id = (
