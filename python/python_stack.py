@@ -166,9 +166,7 @@ class PythonStack(Stack):
             "BUCKET_NAME": bucket.bucket_name,
             "AWS_LAMBDA_EXEC_WRAPPER": "/opt/otel-instrument",
             "OTEL_PROPAGATORS": "tracecontext",
-            "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.honeycomb.io",
-            "OTEL_EXPORTER_OTLP_HEADERS": "x-honeycomb-team=cy0o1xZiugYTwx7fGGWgkG",
-            "OTEL_SERVICE_NAME": "dassie",
+            "OPENTELEMETRY_COLLECTOR_CONFIG_FILE": "/var/task/collector.yaml",
         }
         build_articles = lambda_.Function(
             self,
