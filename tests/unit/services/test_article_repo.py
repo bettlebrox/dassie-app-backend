@@ -7,7 +7,6 @@ from models.article import Article
 from models.models import Browsed
 from models.theme import Theme
 from repos import ArticleRepository
-from theme_repo import ThemeRepository
 
 
 @pytest.fixture
@@ -18,16 +17,14 @@ def mock_session():
 @pytest.fixture
 def article_repo(mock_session):
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
     return repo
 
 
 @pytest.fixture
 def mock_query(article_repo):
     mock_query = MagicMock()
-    mock_session = MagicMock()
-    mock_session.return_value.query.return_value = mock_query
-    article_repo.session = mock_session
+    article_repo._session.return_value.query.return_value = mock_query
     return mock_query
 
 
@@ -90,7 +87,7 @@ def test_enhance_article():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Create a new article, themes, and embedding
     article = Article(
@@ -161,7 +158,7 @@ def test_upsert_article():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Mock the query result
     mock_query.filter_by.return_value.all.return_value = []
@@ -194,7 +191,7 @@ def test_get_article_by_url():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Mock the query result
     mock_query.options.return_value.filter_by.return_value.all.return_value = [
@@ -223,7 +220,7 @@ def test_update_article():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Create a new article
     article = Article(
@@ -246,7 +243,7 @@ def test_delete_article():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Create a new article
     article = Article(
@@ -274,7 +271,7 @@ def test_add_article():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Create a new article
     article = Article(
@@ -301,7 +298,7 @@ def test_get_article_by_id():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Call the get_by_id method
     article = repo.get_by_id(1)
@@ -328,7 +325,7 @@ def test_get_all_articles():
 
     # Create the repository and set the mock session
     repo = ArticleRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = mock_session
+    repo._session = mock_session
 
     # Call the get_all method
     articles = repo.get_all()

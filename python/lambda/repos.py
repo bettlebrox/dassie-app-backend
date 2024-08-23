@@ -17,20 +17,20 @@ class BasePostgresRepository:
             f"postgresql://{username}:{password}@{db_cluster_endpoint}/{dbname}",
             pool_timeout=10,
         )
-        self.session = sessionmaker(bind=engine, expire_on_commit=False)
+        self._session = sessionmaker(bind=engine, expire_on_commit=False)
         self._logger = logger
         # Base.metadata.create_all(engine)
 
     def get_all(self):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return session.query(self.model).all()
 
     def get_by_id(self, id):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return session.query(self.model).get(id)
 
     def get_by_title(self, title):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return session.query(self.model).filter_by(_title=title).first()
 
     def get_or_insert(self, model):
@@ -40,18 +40,18 @@ class BasePostgresRepository:
             return self.update(model)
 
     def add(self, model):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             session.add(model)
             session.commit()
             return model
 
     def delete(self, model):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             session.delete(model)
             session.commit()
 
     def update(self, model):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             detached = session.merge(model)
             session.commit()
             return detached
@@ -63,7 +63,7 @@ class BrowsedRepository(BasePostgresRepository):
         self.model = Browsed
 
     def get_by_browse_and_article(self, browse_id, article_id):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return (
                 session.query(self.model)
                 .filter_by(_browse_id=browse_id, _article_id=article_id)
@@ -77,7 +77,7 @@ class BrowseRepository(BasePostgresRepository):
         self.model = Browse
 
     def get_by_tab_id(self, tab_id):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return (
                 session.query(self.model)
                 .options(joinedload(Browse._articles))
@@ -99,7 +99,7 @@ class ArticleRepository(BasePostgresRepository):
         self.model = Article
 
     def get_by_id(self, id):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             return (
                 session.query(self.model)
                 .options(
@@ -110,7 +110,7 @@ class ArticleRepository(BasePostgresRepository):
             )
 
     def get_by_url(self, url):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             articles = (
                 session.query(self.model)
                 .options(joinedload(self.model._themes))
@@ -125,14 +125,14 @@ class ArticleRepository(BasePostgresRepository):
         existing = self.get_by_url(model.url)
         if existing is not None:
             return existing
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             session.add(model)
             session.commit()
             detached = session.merge(model)
             return detached
 
     def enhance(self, article: Article, themes: List[Theme], embedding: List[float]):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             for theme in themes:
                 association = Association(article.id, theme._id)
                 session.add(association)
@@ -150,7 +150,7 @@ class ArticleRepository(BasePostgresRepository):
         filter_embedding=None,
         threshold: float = 0.8,
     ):
-        with closing(self.session()) as session:
+        with closing(self._session()) as session:
             query = (
                 session.query(self.model)
                 .options(defer(Article._embedding))

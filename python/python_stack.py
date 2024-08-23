@@ -92,16 +92,11 @@ class PythonStack(Stack):
                 version=rds.AuroraPostgresEngineVersion.VER_16_1
             ),
             serverless_v2_max_capacity=16,
-            serverless_v2_min_capacity=1,
+            serverless_v2_min_capacity=0.5,
             vpc=vpc,
             writer=rds.ClusterInstance.serverless_v2(
                 "writer", enable_performance_insights=True
             ),
-            readers=[
-                rds.ClusterInstance.serverless_v2(
-                    "reader", enable_performance_insights=True
-                )
-            ],
             storage_encrypted=True,
             monitoring_interval=Duration.seconds(60),
             monitoring_role=iam.Role.from_role_arn(

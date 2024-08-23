@@ -2,8 +2,8 @@ import logging
 from lambda_init_context import LambdaInitContext
 from models.theme import ThemeType
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger = logging.getLogger("get_themes")
+logger.setLevel(logging.DEBUG)
 
 init_context = None
 
@@ -40,6 +40,8 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
             result = theme_repo.get_top(max, source)
         elif sort_field == "updated_at":
             result = theme_repo.get_recent(max, source)
+        elif sort_field == "recently_browsed":
+            result = theme_repo.get_recently_browsed(max, source, days=1)
         else:
             raise ValueError("Invalid sort field: {}".format(sort_field))
         response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))

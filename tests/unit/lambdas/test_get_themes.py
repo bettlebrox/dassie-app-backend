@@ -77,6 +77,18 @@ def test_get_themes_with_params():
     response = lambda_handler(
         {
             "path": "/themes",
+            "queryStringParameters": {"sortField": "recently_browsed", "max": 20},
+        },
+        {},
+        theme_repo,
+        useGlobal=False,
+    )
+    assert (
+        response["statusCode"] == 200
+    ), "should be able to get themes by recently browsed"
+    response = lambda_handler(
+        {
+            "path": "/themes",
             "queryStringParameters": {
                 "sortField": "updated_at",
                 "source": "custom",

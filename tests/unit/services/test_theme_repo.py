@@ -11,13 +11,40 @@ from models.theme import Theme
 @pytest.fixture
 def repo():
     repo = ThemeRepository("username", "password", "dbname", "db_cluster_endpoint")
-    repo.session = MagicMock()
+    repo._session = MagicMock()
     return repo
 
 
 @pytest.fixture
 def mock_query(repo: ThemeRepository) -> Any:
-    return repo.session.return_value.query.return_value
+    return repo._session.return_value.query.return_value
+
+
+def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
+    # Mock the query result
+    art1 = Article(original_title="Test Article 1", url="https://example.com")
+    art2 = Article(original_title="Test Article 2", url="https://example.com")
+    art1._id = 1
+    art2._id = 2
+    article_query = (
+        mock_query.join.return_value.filter.return_value.group_by.return_value.all
+    )
+    article_query.return_value = [
+        art1,
+        art2,
+    ]
+    theme_query = (
+        mock_query.join.return_value.filter.return_value.group_by.return_value.order_by.return_value.limit
+    )
+    theme_query.return_value = [Theme(original_title="Test Theme")]
+    results = repo.get_recently_browsed()
+    assert len(results) == 1
+    assert results[0].original_title == "Test Theme"
+    assert (Association.article_id.in_([art.id for art in [art1, art2]])).compare(
+        mock_query.join.return_value.filter.call_args[0][0]
+    )
+    article_query.assert_called_once()
+    theme_query.assert_called_once()
 
 
 def test_get_all_themes(repo: ThemeRepository, mock_query: Any):
@@ -78,8 +105,8 @@ def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
     association = repo.add_related(article, ["test+theme"])
 
     # Assert that the theme was added and the association was created
-    repo.session.return_value.add.assert_called()
-    repo.session.return_value.commit.assert_called()
+    repo._session.return_value.add.assert_called()
+    repo._session.return_value.commit.assert_called()
     assert association[0].article_id == article._id
     assert association[0].theme_id == theme._id
 
