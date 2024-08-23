@@ -1,4 +1,5 @@
-from repos import ArticleRepository
+from repos import ArticleRepository, BrowseRepository, BrowsedRepository
+from services.articles_service import ArticlesService
 from services.openai_client import OpenAIClient
 from services.themes_service import ThemesService
 
@@ -29,6 +30,7 @@ class LambdaInitContext:
         openai_client=None,
         theme_repo=None,
         theme_service=None,
+        article_service=None,
     ):
         self._secrets_manager = secrets_manager
         self._db_secrets = db_secrets
@@ -36,6 +38,39 @@ class LambdaInitContext:
         self._openai_client = openai_client
         self._theme_repo = theme_repo
         self._theme_service = theme_service
+        self._article_service = article_service
+        self._browse_repo = None
+        self._browsed_repo = None
+
+    @property
+    def browsed_repo(self):
+        if self._browsed_repo is None:
+            self._browsed_repo = BrowsedRepository(
+                *self.db_secrets,
+                os.getenv("DB_CLUSTER_ENDPOINT"),
+            )
+        return self._browsed_repo
+
+    @property
+    def browse_repo(self):
+        if self._browse_repo is None:
+            self._browse_repo = BrowseRepository(
+                *self.db_secrets,
+                os.getenv("DB_CLUSTER_ENDPOINT"),
+            )
+        return self._browse_repo
+
+    @property
+    def article_service(self):
+        if self._article_service is None:
+            self._article_service = ArticlesService(
+                self.article_repo,
+                self.theme_repo,
+                self.browse_repo,
+                self.browsed_repo,
+                self.openai_client,
+            )
+        return self._article_service
 
     @property
     def secrets_manager(self):

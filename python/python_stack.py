@@ -140,17 +140,12 @@ class PythonStack(Stack):
             "RequirementsLayerExtended1",
             layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:3",
         )
-        nr_layer = lambda_.LayerVersion.from_layer_version_arn(
+        otel_layer = lambda_.LayerVersion.from_layer_version_arn(
             self,
-            "NewRelicLayer",
-            layer_version_arn="arn:aws:lambda:eu-west-1:451483290750:layer:NewRelicPython39:70",
+            "OtelLayer",
+            layer_version_arn="arn:aws:lambda:eu-west-1:901920570463:layer:aws-otel-python-amd64-ver-1-25-0:1",
         )
 
-        nr_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "nr_license_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:NEW_RELIC_LICENSE_KEY-vZyhkl",
-        )
         openai_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
             "openai_api_key",
@@ -169,7 +164,29 @@ class PythonStack(Stack):
             "NEW_RELIC_LAMBDA_EXTENSION_ENABLED": "false",
             "DDB_TABLE": ddb.table_name,
             "BUCKET_NAME": bucket.bucket_name,
+            "AWS_LAMBDA_EXEC_WRAPPER": "/opt/otel-instrument",
+            "OTEL_PROPAGATORS": "tracecontext",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.honeycomb.io",
+            "OTEL_EXPORTER_OTLP_HEADERS": "x-honeycomb-team=cy0o1xZiugYTwx7fGGWgkG",
+            "OTEL_SERVICE_NAME": "dassie",
         }
+        build_articles = lambda_.Function(
+            self,
+            "buildArticles",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            handler="build_articles.lambda_handler",
+            vpc=vpc,
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            security_groups=sql_db.connections.security_groups,
+            environment=lambdas_env,
+            tracing=lambda_.Tracing.PASS_THROUGH,
+            timeout=Duration.seconds(45),
+        )
+        sql_db.grant_data_api_access(build_articles)
+        sql_db.connections.allow_default_port_from(build_articles)
+        sql_db.secret.grant_read(build_articles)
+
         getThemes = lambda_.Function(
             self,
             "getThemes",
@@ -177,16 +194,15 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_themes.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(getThemes)
         sql_db.connections.allow_default_port_from(getThemes)
         sql_db.secret.grant_read(getThemes)
-        nr_secret.grant_read(getThemes)
 
         getArticles = lambda_.Function(
             self,
@@ -195,16 +211,15 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_articles.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(getArticles)
         sql_db.connections.allow_default_port_from(getArticles)
         sql_db.secret.grant_read(getArticles)
-        nr_secret.grant_read(getArticles)
         openai_secret.grant_read(getArticles)
         langfuse_secret.grant_read(getArticles)
 
@@ -215,16 +230,15 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(addTheme)
         sql_db.connections.allow_default_port_from(addTheme)
         sql_db.secret.grant_read(addTheme)
-        nr_secret.grant_read(addTheme)
         openai_secret.grant_read(addTheme)
         langfuse_secret.grant_read(addTheme)
 
@@ -235,16 +249,15 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(delTheme)
         sql_db.connections.allow_default_port_from(delTheme)
         sql_db.secret.grant_read(delTheme)
-        nr_secret.grant_read(delTheme)
 
         delRelated = lambda_.Function(
             self,
@@ -253,16 +266,15 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_related.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, nr_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(45),
         )
         sql_db.grant_data_api_access(delRelated)
         sql_db.connections.allow_default_port_from(delRelated)
         sql_db.secret.grant_read(delRelated)
-        nr_secret.grant_read(delRelated)
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
             security_group.add_ingress_rule(
@@ -281,7 +293,8 @@ class PythonStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
-            tracing=lambda_.Tracing.ACTIVE,
+            tracing=lambda_.Tracing.PASS_THROUGH,
+            layers=[otel_layer],
             timeout=Duration.seconds(5),
             environment=lambdas_env,
         )

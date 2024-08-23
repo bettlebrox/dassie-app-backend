@@ -15,7 +15,6 @@ CONTEXT_WINDOW_SIZE = 16000
 
 
 def main():
-    weave.init("themify")
     secretsmanager = boto3.client("secretsmanager")
     get_secret_value_response = secretsmanager.get_secret_value(
         SecretId=os.getenv("DB_SECRET_ARN")

@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 from theme_repo import ThemeRepository
-from models.article import Article
 from repos import (
     ArticleRepository,
     BrowseRepository,
@@ -34,25 +33,25 @@ def main():
     article_repo = ArticleRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     theme_repo = ThemeRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     browse_repo = BrowseRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     browsed_repo = BrowsedRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     openai_client = OpenAIClient(
@@ -67,7 +66,7 @@ def main():
                 len(navlog["body_text"]) < 100
                 or "url" not in navlog
                 or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
-                < datetime.now() - timedelta(days=90)
+                < datetime.now() - timedelta(days=7)
             ):
                 continue
             article_service.process_navlog(navlog)

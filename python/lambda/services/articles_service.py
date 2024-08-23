@@ -73,7 +73,13 @@ class ArticlesService:
             article_id=article.id, browse_id=browse.id
         )
         if browsed is None:
-            self._browsed_repo.add(Browsed(article_id=article.id, browse_id=browse.id))
+            self._browsed_repo.add(
+                Browsed(
+                    article_id=article.id,
+                    browse_id=browse.id,
+                    logged_at=navlog["created_at"],
+                )
+            )
         else:
             browsed.count += 1
             self._browsed_repo.update(browsed)

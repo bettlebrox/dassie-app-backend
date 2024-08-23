@@ -27,7 +27,7 @@ def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
     art1._id = 1
     art2._id = 2
     article_query = (
-        mock_query.join.return_value.filter.return_value.group_by.return_value.all
+        mock_query.filter.return_value.join.return_value.group_by.return_value.all
     )
     article_query.return_value = [
         art1,

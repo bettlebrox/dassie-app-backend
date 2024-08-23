@@ -34,6 +34,14 @@ class Browsed(Base):
     _logged_at = Column(DateTime, index=True)
 
     @property
+    def logged_at(self):
+        return self._logged_at
+
+    @logged_at.setter
+    def logged_at(self, value):
+        self._logged_at = value
+
+    @property
     def count(self):
         return self._count
 
