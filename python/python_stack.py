@@ -73,19 +73,7 @@ class PythonDependenciesStack(Stack):
 
 class PythonStack(Stack):
 
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        **kwargs,
-    ) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-        bucket = s3.Bucket(
-            self,
-            "navlog-images",
-            versioned=True,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-        )
+    def instrument_with_datadog(self, functions):
         datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
             "datadog_api_key",
@@ -98,6 +86,23 @@ class PythonStack(Stack):
             site="datadoghq.eu",
             python_layer_version=98,
             extension_layer_version=64,
+        )
+        datadog_ext.add_lambda_functions(functions)
+        for f in functions:
+            datadog_secret.grant_read(f)
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        bucket = s3.Bucket(
+            self,
+            "navlog-images",
+            versioned=True,
+            encryption=s3.BucketEncryption.S3_MANAGED,
         )
         vpc = ec2.Vpc(self, "AuroraVpc1")
         sql_db = rds.DatabaseCluster(
@@ -172,9 +177,11 @@ class PythonStack(Stack):
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
             "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
             "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
-            "NEW_RELIC_LAMBDA_EXTENSION_ENABLED": "false",
             "DDB_TABLE": ddb.table_name,
             "BUCKET_NAME": bucket.bucket_name,
+            "DD_SERVERLESS_LOGS_ENABLED": "true",
+            "DD_TRACE_ENABLED": "true",
+            "DD_LOCAL_TEST": "false",
         }
         build_articles = lambda_.Function(
             self,
@@ -213,7 +220,6 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(getThemes)
         sql_db.connections.allow_default_port_from(getThemes)
         sql_db.secret.grant_read(getThemes)
-        datadog_secret.grant_read(getThemes)
 
         getArticles = lambda_.Function(
             self,
@@ -234,7 +240,6 @@ class PythonStack(Stack):
         sql_db.connections.allow_default_port_from(getArticles)
         sql_db.secret.grant_read(getArticles)
         openai_secret.grant_read(getArticles)
-        datadog_secret.grant_read(getArticles)
         langfuse_secret.grant_read(getArticles)
 
         addTheme = lambda_.Function(
@@ -257,7 +262,6 @@ class PythonStack(Stack):
         sql_db.secret.grant_read(addTheme)
         openai_secret.grant_read(addTheme)
         langfuse_secret.grant_read(addTheme)
-        datadog_secret.grant_read(addTheme)
 
         delTheme = lambda_.Function(
             self,
@@ -277,7 +281,6 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(delTheme)
         sql_db.connections.allow_default_port_from(delTheme)
         sql_db.secret.grant_read(delTheme)
-        datadog_secret.grant_read(delTheme)
 
         delRelated = lambda_.Function(
             self,
@@ -297,7 +300,6 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(delRelated)
         sql_db.connections.allow_default_port_from(delRelated)
         sql_db.secret.grant_read(delRelated)
-        datadog_secret.grant_read(delRelated)
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
             security_group.add_ingress_rule(
@@ -322,7 +324,6 @@ class PythonStack(Stack):
         )
         ddb.grant_read_write_data(addNavlog)
         bucket.grant_read_write(addNavlog)
-        datadog_secret.grant_read(addNavlog)
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
         api_role = iam.Role.from_role_arn(
             self,
@@ -378,7 +379,7 @@ class PythonStack(Stack):
                 ),
             ),
         )
-        datadog_ext.add_lambda_functions(
+        self.instrument_with_datadog(
             [
                 build_articles,
                 getThemes,
