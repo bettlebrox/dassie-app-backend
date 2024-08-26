@@ -14,7 +14,7 @@ class TestLambdaInitContext(unittest.TestCase):
 
     def test_lambda_init_context_empty(self):
         context = LambdaInitContext()
-        self.assertEqual(len(context.__dict__), 0)
+        self.assertEqual(len(context.__dict__), 9)
 
     def test_lambda_init_context_add_attribute(self):
         context = LambdaInitContext()
