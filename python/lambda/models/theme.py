@@ -120,9 +120,8 @@ class Theme(Base):
 
     @related.setter
     def related(self, value: List[Article]):
-        if self._related != value:
-            self._avg_article_distance = self.calculate_avg_cos_distance_per_article()
         self._related = value
+        self._avg_article_distance = self.calculate_avg_cos_distance_per_article()
 
     @property
     def avg_article_distance(self):

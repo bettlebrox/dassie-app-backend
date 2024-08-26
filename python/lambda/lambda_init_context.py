@@ -1,5 +1,6 @@
 from repos import ArticleRepository, BrowseRepository, BrowsedRepository
 from services.articles_service import ArticlesService
+from services.navlogs_service import NavlogService
 from services.openai_client import OpenAIClient
 from services.themes_service import ThemesService
 
@@ -31,6 +32,7 @@ class LambdaInitContext:
         theme_repo=None,
         theme_service=None,
         article_service=None,
+        navlog_service=None,
     ):
         self._secrets_manager = secrets_manager
         self._db_secrets = db_secrets
@@ -41,6 +43,7 @@ class LambdaInitContext:
         self._article_service = article_service
         self._browse_repo = None
         self._browsed_repo = None
+        self._navlog_service = navlog_service
 
     @property
     def browsed_repo(self):
@@ -131,3 +134,11 @@ class LambdaInitContext:
                 self.theme_repo, self.article_repo, self.openai_client
             )
         return self._theme_service
+
+    @property
+    def navlog_service(self):
+        if self._navlog_service is None:
+            self._navlog_service = NavlogService(
+                os.getenv("BUCKET_NAME"), os.getenv("DDB_TABLE")
+            )
+        return self._navlog_service

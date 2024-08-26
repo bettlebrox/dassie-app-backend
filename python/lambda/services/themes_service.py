@@ -43,14 +43,14 @@ class ThemesService:
         theme.source = theme_type
         if given_embedding is None and theme.embedding is None:
             theme.embedding = self.openai_client.get_embedding(theme.original_title)
-        else:
+        elif given_embedding is not None:
             theme.embedding = given_embedding
         if related_articles is None and (
             theme.related is None or len(theme.related) == 0
         ):
             theme.related = self.article_repo.get_by_theme_embedding(theme.embedding)
             logger.info(f"Found {len(theme.related)} related articles")
-        else:
+        elif related_articles is not None:
             theme.related = related_articles
         theme = self.theme_repo.upsert(theme)
         theme = self.theme_repo.get_by_id(theme.id)

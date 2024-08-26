@@ -9,18 +9,14 @@ from services.navlogs_service import NavlogService
 logger = logging.getLogger("build_articles")
 logger.setLevel(logging.DEBUG)
 
-navlog_service = NavlogService(os.getenv("BUCKET_NAME"), os.getenv("DDB_TABLE"))
 init_context = None
 
 
 def lambda_handler(
     event,
     context,
-    theme_repo=None,
-    article_repo=None,
-    browse_repo=None,
-    browsed_repo=None,
-    openai_client=None,
+    article_service=None,
+    navlog_service=None,
     useGlobal=True,
 ):
     logger.debug("Event: {} Context: {}".format(event, context))
@@ -28,20 +24,10 @@ def lambda_handler(
     global init_context
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(
-            theme_repo=theme_repo,
-            article_repo=article_repo,
-            browse_repo=browse_repo,
-            browsed_repo=browsed_repo,
-            openai_client=openai_client,
+            article_service=article_service,
+            navlog_service=navlog_service,
         )
-    navlogs = navlog_service.get_content_navlogs()
-    article_service = ArticlesService(
-        init_context.article_repo,
-        init_context.theme_repo,
-        init_context.browse_repo,
-        init_context.browsed_repo,
-        init_context.openai_client,
-    )
+    navlogs = init_context.navlog_service.get_content_navlogs()
     count = 0
     skipped = 0
     for navlog in navlogs:

@@ -23,16 +23,18 @@ def main():
     article_repo = ArticleRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
     theme_repo = ThemeRepository(
         secret["username"],
         secret["password"],
-        secret["dbname"],
+        "dassie",
         os.getenv("DB_CLUSTER_ENDPOINT"),
     )
-    openai_client = OpenAIClient(os.environ["OPENAI_API_KEY"])
+    openai_client = OpenAIClient(
+        os.environ["OPENAI_API_KEY"], os.environ["LANGFUSE_KEY"]
+    )
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     top_themes = theme_repo.get_top(100)
     for theme in top_themes:
