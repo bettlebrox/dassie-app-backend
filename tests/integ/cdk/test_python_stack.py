@@ -15,7 +15,7 @@ def test_resources_created():
     stack = PythonStack(app, "python")
     template = assertions.Template.from_stack(stack)
 
-    template.resource_count_is("AWS::Lambda::Function", 6)
+    template.resource_count_is("AWS::Lambda::Function", 7)
 
     template.resource_count_is("AWS::DynamoDB::Table", 1)
 
