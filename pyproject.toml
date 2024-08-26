@@ -4,3 +4,5 @@ addopts = [
 ]
 testpaths = ["tests"]
 pythonpath = "python/lambda"
+[tool.pyright]
+exclude = ["**/cdk.out"]

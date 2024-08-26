@@ -11,10 +11,9 @@ import aws_cdk.aws_rds as rds
 import aws_cdk.aws_ec2 as ec2
 import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
-import aws_cdk.aws_logs_destinations as destinations
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
 import aws_cdk.aws_iam as iam
-
+import datadog_cdk_constructs_v2 as datadog
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -32,6 +31,7 @@ class PythonDependenciesStack(Stack):
             self,
             "RequirementsLayer",
             entry="python/layer",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Requirements layer",
         )
@@ -39,6 +39,7 @@ class PythonDependenciesStack(Stack):
             self,
             "RequirementsLayerExtended",
             entry="python/layer1",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Another requirements layer - in order to split deps across zip file limits",
         )
@@ -46,6 +47,7 @@ class PythonDependenciesStack(Stack):
             self,
             "RequirementsLayerExtended2",
             entry="python/layer2",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Another requirements layer - in order to split deps across zip file limits",
         )
@@ -84,6 +86,14 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
+        datadog_ext = datadog.Datadog(
+            self,
+            "datadog",
+            api_key="459d94402a9da3599aa594ec71275bb6",
+            site="datadoghq.eu",
+            python_layer_version=98,
+            extension_layer_version=64,
+        )
         vpc = ec2.Vpc(self, "AuroraVpc1")
         sql_db = rds.DatabaseCluster(
             self,
@@ -104,6 +114,7 @@ class PythonStack(Stack):
                 "monitoring-role",
                 "arn:aws:iam::559845934392:role/emaccess",
             ),
+            cloudwatch_logs_exports=["postgresql"],
         )
         bastion = ec2.SecurityGroup.from_security_group_id(
             self,
@@ -128,22 +139,17 @@ class PythonStack(Stack):
         reqs_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayer",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:37",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:40",
         )
         reqs_layer_1 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended6C14504C:2",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended6C14504C:5",
         )
         reqs_layer_2 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended1",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:3",
-        )
-        otel_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "OtelLayer",
-            layer_version_arn="arn:aws:lambda:eu-west-1:901920570463:layer:aws-otel-python-amd64-ver-1-25-0:1",
+            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:6",
         )
 
         openai_secret = secretsmanager.Secret.from_secret_complete_arn(
@@ -164,9 +170,6 @@ class PythonStack(Stack):
             "NEW_RELIC_LAMBDA_EXTENSION_ENABLED": "false",
             "DDB_TABLE": ddb.table_name,
             "BUCKET_NAME": bucket.bucket_name,
-            "AWS_LAMBDA_EXEC_WRAPPER": "/opt/otel-instrument",
-            "OTEL_PROPAGATORS": "tracecontext",
-            "OPENTELEMETRY_COLLECTOR_CONFIG_FILE": "/var/task/collector.yaml",
         }
         build_articles = lambda_.Function(
             self,
@@ -175,7 +178,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="build_articles.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -192,7 +197,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_themes.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -209,7 +216,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="get_articles.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -228,7 +237,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -247,7 +258,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_theme.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -264,7 +277,9 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="del_related.lambda_handler",
             vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2, otel_layer],
+            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
+            architecture=lambda_.Architecture.ARM_64,
+            memory_size=1024,
             security_groups=sql_db.connections.security_groups,
             environment=lambdas_env,
             tracing=lambda_.Tracing.PASS_THROUGH,
@@ -292,7 +307,6 @@ class PythonStack(Stack):
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
-            layers=[otel_layer],
             timeout=Duration.seconds(5),
             environment=lambdas_env,
         )
@@ -354,22 +368,9 @@ class PythonStack(Stack):
                 ),
             ),
         )
-
-        nr_logger = lambda_.Function.from_function_arn(
-            self,
-            "NRLogger",
-            "arn:aws:lambda:eu-west-1:559845934392:function:newrelic-log-ingestion-06a0f5fff877",
+        datadog_ext.add_lambda_functions(
+            [build_articles, getThemes, getArticles, addTheme, delTheme, delRelated]
         )
-        logs.SubscriptionFilter(
-            self,
-            "ApiGatewayAccessLogsSubscription",
-            log_group=log_group,
-            destination=destinations.LambdaDestination(nr_logger),
-            filter_pattern=logs.FilterPattern.any_term(
-                "Method=OPTIONS", "Method=GET", "Method=PUT", "Method=POST"
-            ),
-        )
-
         api = apiGateway.root.add_resource("api")
         todos = api.add_resource(
             "navlogs",

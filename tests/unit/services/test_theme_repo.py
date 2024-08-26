@@ -6,6 +6,7 @@ from theme_repo import ThemeRepository
 from models.models import Association
 from models.article import Article
 from models.theme import Theme
+from sqlalchemy.orm.exc import NoResultFound
 
 
 @pytest.fixture
@@ -127,3 +128,47 @@ def test_del_related_article(repo: ThemeRepository, mock_query: Any):
         mock_query.filter.call_args[0][1]
     )
     mock_query.filter.return_value.delete.assert_called()
+
+
+def test_upsert_existing_theme(repo: ThemeRepository, mock_query: Any):
+    existing_theme = Theme(original_title="Existing Theme")
+    existing_theme._id = 1
+    mock_query.options.return_value.filter.return_value.one.return_value = (
+        existing_theme
+    )
+
+    updated_theme = Theme(original_title="Updated Theme")
+    updated_theme._id = 1
+    repo._session.return_value.merge.return_value = updated_theme
+    result = repo.upsert(updated_theme)
+
+    assert result.original_title == "Updated Theme"
+    repo._session.return_value.merge.assert_called_once_with(updated_theme)
+    repo._session.return_value.commit.assert_called_once()
+
+
+def test_upsert_new_theme(repo: ThemeRepository, mock_query: Any):
+    mock_query.options.return_value.filter.return_value.one.side_effect = (
+        NoResultFound()
+    )
+
+    new_theme = Theme(original_title="New Theme")
+    new_theme._id = 1
+
+    result = repo.upsert(new_theme)
+
+    assert result.original_title == "New Theme"
+    repo._session.return_value.add.assert_called_once_with(new_theme)
+    repo._session.return_value.commit.assert_called_once()
+
+
+def test_upsert_with_none_id(repo: ThemeRepository, mock_query: Any):
+    theme_without_id = Theme(original_title="Theme Without ID")
+    theme_without_id._id = None
+    repo._session.return_value.merge.return_value = theme_without_id
+
+    result = repo.upsert(theme_without_id)
+
+    assert result.original_title == "Theme Without Id"
+    repo._session.return_value.merge.assert_called_once_with(theme_without_id)
+    repo._session.return_value.commit.assert_called_once()

@@ -30,7 +30,7 @@ def mock_query(article_repo):
 
 @pytest.fixture
 def mock_simple_order_by(mock_query):
-    return mock_query.options.return_value.options.return_value.order_by
+    return mock_query.options.return_value.order_by
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def mock_simple_limit(mock_simple_order_by):
 
 @pytest.fixture
 def mock_where(mock_query):
-    return mock_query.options.return_value.options.return_value.where
+    return mock_query.options.return_value.where
 
 
 def test_get_articles(article_repo, mock_simple_order_by):
@@ -374,14 +374,14 @@ def test_get_with_embedding_filter(article_repo, mock_where, mock_query):
 
 
 def test_get_sort_by_browses(article_repo, mock_query):
-    mock_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
+    mock_query.options.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
     result = article_repo.get(sort_by="browse")
 
     assert len(result) == 1
-    assert mock_query.options.return_value.options.return_value.join.return_value.group_by.return_value.order_by.call_args[
+    assert mock_query.options.return_value.join.return_value.group_by.return_value.order_by.call_args[
         0
     ][
         0

@@ -151,11 +151,7 @@ class ArticleRepository(BasePostgresRepository):
         threshold: float = 0.8,
     ):
         with closing(self._session()) as session:
-            query = (
-                session.query(self.model)
-                .options(defer(Article._embedding))
-                .options(defer(Article._text))
-            )
+            query = session.query(self.model).options(defer(Article._embedding))
             query = (
                 query.where(
                     (1 - Article._embedding.cosine_distance(filter_embedding))

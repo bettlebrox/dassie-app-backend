@@ -6,7 +6,7 @@ from repos import BasePostgresRepository, logger
 
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-
+from sqlalchemy.orm.exc import NoResultFound
 
 from contextlib import closing
 from datetime import datetime, timedelta
@@ -86,8 +86,7 @@ class ThemeRepository(BasePostgresRepository):
             return query
 
     def add(self, model):
-        model = super().add(model)
-        return self.get_by_id(model.id)
+        return super().add(model)
 
     def get_by_id(self, id):
         with closing(self._session()) as session:
@@ -184,3 +183,10 @@ class ThemeRepository(BasePostgresRepository):
             session.delete(model)
             session.commit()
             session.flush()
+
+    def upsert(self, model):
+        try:
+            if self.get_by_id(model.id) is not None:
+                return self.update(model)
+        except NoResultFound as e:
+            return self.add(model)
