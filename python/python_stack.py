@@ -86,10 +86,15 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
+        datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "datadog_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:prod/dassie/datadog-axXB8t",
+        )
         datadog_ext = datadog.Datadog(
             self,
             "datadog",
-            api_key="459d94402a9da3599aa594ec71275bb6",
+            api_key_secret=datadog_secret,
             site="datadoghq.eu",
             python_layer_version=98,
             extension_layer_version=64,
@@ -208,6 +213,7 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(getThemes)
         sql_db.connections.allow_default_port_from(getThemes)
         sql_db.secret.grant_read(getThemes)
+        datadog_secret.grant_read(getThemes)
 
         getArticles = lambda_.Function(
             self,
@@ -228,6 +234,7 @@ class PythonStack(Stack):
         sql_db.connections.allow_default_port_from(getArticles)
         sql_db.secret.grant_read(getArticles)
         openai_secret.grant_read(getArticles)
+        datadog_secret.grant_read(getArticles)
         langfuse_secret.grant_read(getArticles)
 
         addTheme = lambda_.Function(
@@ -250,6 +257,7 @@ class PythonStack(Stack):
         sql_db.secret.grant_read(addTheme)
         openai_secret.grant_read(addTheme)
         langfuse_secret.grant_read(addTheme)
+        datadog_secret.grant_read(addTheme)
 
         delTheme = lambda_.Function(
             self,
@@ -269,6 +277,7 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(delTheme)
         sql_db.connections.allow_default_port_from(delTheme)
         sql_db.secret.grant_read(delTheme)
+        datadog_secret.grant_read(delTheme)
 
         delRelated = lambda_.Function(
             self,
@@ -288,6 +297,7 @@ class PythonStack(Stack):
         sql_db.grant_data_api_access(delRelated)
         sql_db.connections.allow_default_port_from(delRelated)
         sql_db.secret.grant_read(delRelated)
+        datadog_secret.grant_read(delRelated)
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
             security_group.add_ingress_rule(
@@ -312,7 +322,7 @@ class PythonStack(Stack):
         )
         ddb.grant_read_write_data(addNavlog)
         bucket.grant_read_write(addNavlog)
-
+        datadog_secret.grant_read(addNavlog)
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
         api_role = iam.Role.from_role_arn(
             self,
@@ -369,7 +379,15 @@ class PythonStack(Stack):
             ),
         )
         datadog_ext.add_lambda_functions(
-            [build_articles, getThemes, getArticles, addTheme, delTheme, delRelated]
+            [
+                build_articles,
+                getThemes,
+                getArticles,
+                addTheme,
+                delTheme,
+                delRelated,
+                addNavlog,
+            ],
         )
         api = apiGateway.root.add_resource("api")
         todos = api.add_resource(
