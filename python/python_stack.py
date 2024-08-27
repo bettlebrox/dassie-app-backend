@@ -14,6 +14,8 @@ import aws_cdk.aws_logs as logs
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
 import aws_cdk.aws_iam as iam
 import datadog_cdk_constructs_v2 as datadog
+import aws_cdk.aws_events as events
+import aws_cdk.aws_events_targets as targets
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -24,54 +26,113 @@ PythonLayerStackOutput1 = "PythonLayerStackARN1"
 PythonLayerStackOutput2 = "PythonLayerStackARN2"
 
 
-class PythonDependenciesStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-        reqs_layer = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayer",
-            entry="python/layer",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer",
-        )
-        reqs_layer_1 = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayerExtended",
-            entry="python/layer1",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
-        )
-        reqs_layer_2 = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayerExtended2",
-            entry="python/layer2",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput,
-            value=reqs_layer.layer_version_arn,
-            export_name="PythonLayerStackARN",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput1,
-            value=reqs_layer_1.layer_version_arn,
-            export_name="PythonLayerStackARN1",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput2,
-            value=reqs_layer_2.layer_version_arn,
-            export_name="PythonLayerStackARN2",
-        )
-
-
 class PythonStack(Stack):
+
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        self.vpc = ec2.Vpc(self, "AuroraVpc1")
+        self.bastion = ec2.SecurityGroup.from_security_group_id(
+            self,
+            "bastion",
+            security_group_id="sg-0669c97cc65247ecd",
+        )
+        self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
+        self.ddb = self.create_ddb_table()
+        self.openai_secret, self.langfuse_secret = self.create_secrets()
+        (
+            self.bucket,
+            self.reqs_layers,
+            self.lambdas_env,
+        ) = self.create_common_lambda_dependencies(
+            self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
+        )
+        lambda_function_props = {
+            "runtime": lambda_.Runtime.PYTHON_3_9,
+            "code": lambda_.AssetCode.from_asset(
+                path.join(os.getcwd(), "python/lambda")
+            ),
+            "vpc": self.vpc,
+            "layers": self.reqs_layers,
+            "architecture": lambda_.Architecture.ARM_64,
+            "memory_size": 1024,
+            "security_groups": self.sql_db.connections.security_groups,
+            "environment": self.lambdas_env,
+            "tracing": lambda_.Tracing.PASS_THROUGH,
+            "timeout": Duration.seconds(45),
+        }
+
+        self.functions = {
+            "build_articles": self.create_lambda_function(
+                "build_articles",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "get_themes": self.create_lambda_function(
+                "get_themes",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "get_articles": self.create_lambda_function(
+                "get_articles",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "add_theme": self.create_lambda_function(
+                "add_theme",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "del_theme": self.create_lambda_function(
+                "del_theme",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "del_related": self.create_lambda_function(
+                "del_related",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "add_navlog": self.create_add_navlog_function(
+                self.lambdas_env, self.ddb, self.bucket, self.vpc
+            ),
+        }
+        self.instrument_with_datadog(list(self.functions.values()))
+        self.modify_security_group_for_lambda_access(
+            list(self.functions.values()), self.sql_db
+        )
+
+        self.create_scheduled_event_for_build_articles(self.functions["build_articles"])
+
+        self.apiGateway = self.create_api_gateway_resources(self.functions)
+
+        CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
+
+        CfnOutput(
+            self, ApiGatewayDomainStackOutput, value=self.apiGateway.url.split("/")[2]
+        )
+
+        CfnOutput(
+            self,
+            ApiGatewayStageStackOutput,
+            value=self.apiGateway.deployment_stage.stage_name,
+        )
 
     def instrument_with_datadog(self, functions):
         datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
@@ -354,105 +415,62 @@ class PythonStack(Stack):
         )
         return apiGateway
 
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        **kwargs,
-    ) -> None:
+    def create_scheduled_event_for_build_articles(self, build_articles_function):
+        # Create a rule that runs every day at 2:00 AM UTC
+        rule = events.Rule(
+            self,
+            "BuildArticlesScheduleRule",
+            schedule=events.Schedule.cron(
+                minute="0", hour="2", month="*", week_day="*", year="*"
+            ),
+        )
+
+        # Add the Lambda function as a target for this rule
+        rule.add_target(targets.LambdaFunction(build_articles_function))
+
+
+class PythonDependenciesStack(Stack):
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        self.vpc = ec2.Vpc(self, "AuroraVpc1")
-        self.bastion = ec2.SecurityGroup.from_security_group_id(
+        reqs_layer = lambda_python.PythonLayerVersion(
             self,
-            "bastion",
-            security_group_id="sg-0669c97cc65247ecd",
+            "RequirementsLayer",
+            entry="python/layer",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Requirements layer",
         )
-        self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
-        self.ddb = self.create_ddb_table()
-        self.openai_secret, self.langfuse_secret = self.create_secrets()
-        (
-            self.bucket,
-            self.reqs_layers,
-            self.lambdas_env,
-        ) = self.create_common_lambda_dependencies(
-            self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
+        reqs_layer_1 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended",
+            entry="python/layer1",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
         )
-        lambda_function_props = {
-            "runtime": lambda_.Runtime.PYTHON_3_9,
-            "code": lambda_.AssetCode.from_asset(
-                path.join(os.getcwd(), "python/lambda")
-            ),
-            "vpc": self.vpc,
-            "layers": self.reqs_layers,
-            "architecture": lambda_.Architecture.ARM_64,
-            "memory_size": 1024,
-            "security_groups": self.sql_db.connections.security_groups,
-            "environment": self.lambdas_env,
-            "tracing": lambda_.Tracing.PASS_THROUGH,
-            "timeout": Duration.seconds(45),
-        }
-
-        self.functions = {
-            "build_articles": self.create_lambda_function(
-                "build_articles",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "get_themes": self.create_lambda_function(
-                "get_themes",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "get_articles": self.create_lambda_function(
-                "get_articles",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "add_theme": self.create_lambda_function(
-                "add_theme",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "del_theme": self.create_lambda_function(
-                "del_theme",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "del_related": self.create_lambda_function(
-                "del_related",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "add_navlog": self.create_add_navlog_function(
-                self.lambdas_env, self.ddb, self.bucket, self.vpc
-            ),
-        }
-        self.instrument_with_datadog(list(self.functions.values()))
-        self.modify_security_group_for_lambda_access(
-            list(self.functions.values()), self.sql_db
+        reqs_layer_2 = lambda_python.PythonLayerVersion(
+            self,
+            "RequirementsLayerExtended2",
+            entry="python/layer2",
+            compatible_architectures=[lambda_.Architecture.ARM_64],
+            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+            description="Another requirements layer - in order to split deps across zip file limits",
         )
-        self.apiGateway = self.create_api_gateway_resources(self.functions)
-
-        CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
-
-        CfnOutput(
-            self, ApiGatewayDomainStackOutput, value=self.apiGateway.url.split("/")[2]
-        )
-
         CfnOutput(
             self,
-            ApiGatewayStageStackOutput,
-            value=self.apiGateway.deployment_stage.stage_name,
+            PythonLayerStackOutput,
+            value=reqs_layer.layer_version_arn,
+            export_name="PythonLayerStackARN",
+        )
+        CfnOutput(
+            self,
+            PythonLayerStackOutput1,
+            value=reqs_layer_1.layer_version_arn,
+            export_name="PythonLayerStackARN1",
+        )
+        CfnOutput(
+            self,
+            PythonLayerStackOutput2,
+            value=reqs_layer_2.layer_version_arn,
+            export_name="PythonLayerStackARN2",
         )

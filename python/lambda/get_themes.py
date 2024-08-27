@@ -41,7 +41,7 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
         elif sort_field == "updated_at":
             result = theme_repo.get_recent(max, source)
         elif sort_field == "recently_browsed":
-            result = theme_repo.get_recently_browsed(max, source, days=1)
+            result = theme_repo.get_recently_browsed(max, source, days=7)
         else:
             raise ValueError("Invalid sort field: {}".format(sort_field))
         response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))
