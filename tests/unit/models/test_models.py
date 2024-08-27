@@ -2,9 +2,8 @@ from urllib.parse import quote_plus
 import pytest
 from datetime import datetime
 from sqlalchemy.orm import sessionmaker, joinedload
-from sqlalchemy import create_engine, desc, func
+from sqlalchemy import create_engine, func
 from sqlalchemy.exc import IntegrityError
-import uuid
 import sys
 import os
 
@@ -15,9 +14,6 @@ def setup_database_engine():
     return create_engine("sqlite:///:memory:")
 
 
-sys.path.append(
-    os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python/lambda")
-)
 from models.models import (
     Association,
     Recurrent,

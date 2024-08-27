@@ -91,20 +91,16 @@ class PythonStack(Stack):
         for f in functions:
             datadog_secret.grant_read(f)
 
-    def __init__(
-        self,
-        scope: Construct,
-        construct_id: str,
-        **kwargs,
-    ) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-        bucket = s3.Bucket(
-            self,
-            "navlog-images",
-            versioned=True,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-        )
-        vpc = ec2.Vpc(self, "AuroraVpc1")
+    def grant_lambda_permissions(
+        self, lambda_function, sql_db, openai_secret, langfuse_secret
+    ):
+        sql_db.grant_data_api_access(lambda_function)
+        sql_db.connections.allow_default_port_from(lambda_function)
+        sql_db.secret.grant_read(lambda_function)
+        openai_secret.grant_read(lambda_function)
+        langfuse_secret.grant_read(lambda_function)
+
+    def create_postgres_database(self, vpc, bastion):
         sql_db = rds.DatabaseCluster(
             self,
             "dassie1",
@@ -126,12 +122,10 @@ class PythonStack(Stack):
             ),
             cloudwatch_logs_exports=["postgresql"],
         )
-        bastion = ec2.SecurityGroup.from_security_group_id(
-            self,
-            "bastion",
-            security_group_id="sg-0669c97cc65247ecd",
-        )
         sql_db.connections.allow_default_port_from(bastion)
+        return sql_db
+
+    def create_ddb_table(self):
         ddb = dynamodb.Table(
             self,
             "navlogDB",
@@ -145,6 +139,30 @@ class PythonStack(Stack):
                 name="type", type=dynamodb.AttributeType.STRING
             ),
             index_name="type-index",
+        )
+        return ddb
+
+    def create_secrets(self):
+        openai_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "openai_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
+        )
+        langfuse_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "langfuse_secret_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
+        )
+        return openai_secret, langfuse_secret
+
+    def create_common_lambda_dependencies(
+        self, sql_db, openai_secret, langfuse_secret, ddb
+    ):
+        bucket = s3.Bucket(
+            self,
+            "navlog-images",
+            versioned=True,
+            encryption=s3.BucketEncryption.S3_MANAGED,
         )
         reqs_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
@@ -161,17 +179,6 @@ class PythonStack(Stack):
             "RequirementsLayerExtended1",
             layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:6",
         )
-
-        openai_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "openai_api_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
-        )
-        langfuse_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "langfuse_secret_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
-        )
         lambdas_env = {
             "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
@@ -183,135 +190,17 @@ class PythonStack(Stack):
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
         }
-        build_articles = lambda_.Function(
-            self,
-            "buildArticles",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="build_articles.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(build_articles)
-        sql_db.connections.allow_default_port_from(build_articles)
-        sql_db.secret.grant_read(build_articles)
+        return bucket, [reqs_layer, reqs_layer_1, reqs_layer_2], lambdas_env
 
-        getThemes = lambda_.Function(
-            self,
-            "getThemes",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="get_themes.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(getThemes)
-        sql_db.connections.allow_default_port_from(getThemes)
-        sql_db.secret.grant_read(getThemes)
-
-        getArticles = lambda_.Function(
-            self,
-            "getArticles",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="get_articles.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(getArticles)
-        sql_db.connections.allow_default_port_from(getArticles)
-        sql_db.secret.grant_read(getArticles)
-        openai_secret.grant_read(getArticles)
-        langfuse_secret.grant_read(getArticles)
-
-        addTheme = lambda_.Function(
-            self,
-            "addTheme",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="add_theme.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(addTheme)
-        sql_db.connections.allow_default_port_from(addTheme)
-        sql_db.secret.grant_read(addTheme)
-        openai_secret.grant_read(addTheme)
-        langfuse_secret.grant_read(addTheme)
-
-        delTheme = lambda_.Function(
-            self,
-            "delTheme",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="del_theme.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(delTheme)
-        sql_db.connections.allow_default_port_from(delTheme)
-        sql_db.secret.grant_read(delTheme)
-
-        delRelated = lambda_.Function(
-            self,
-            "delRelated",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="del_related.lambda_handler",
-            vpc=vpc,
-            layers=[reqs_layer, reqs_layer_1, reqs_layer_2],
-            architecture=lambda_.Architecture.ARM_64,
-            memory_size=1024,
-            security_groups=sql_db.connections.security_groups,
-            environment=lambdas_env,
-            tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(45),
-        )
-        sql_db.grant_data_api_access(delRelated)
-        sql_db.connections.allow_default_port_from(delRelated)
-        sql_db.secret.grant_read(delRelated)
+    def modify_security_group_for_lambda_access(self, functions, sql_db):
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
-            security_group.add_ingress_rule(
-                addTheme.connections.security_groups[0], ec2.Port.tcp(5432)
-            )
-            security_group.add_ingress_rule(
-                getThemes.connections.security_groups[0], ec2.Port.tcp(5432)
-            )
-            security_group.add_ingress_rule(
-                getArticles.connections.security_groups[0], ec2.Port.tcp(5432)
-            )
+            for function in functions:
+                security_group.add_ingress_rule(
+                    function.connections.security_groups[0], ec2.Port.tcp(5432)
+                )
 
+    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
         addNavlog = lambda_.Function(
             self,
             "addNavLog",
@@ -320,10 +209,33 @@ class PythonStack(Stack):
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(5),
+            vpc=vpc,
             environment=lambdas_env,
         )
         ddb.grant_read_write_data(addNavlog)
         bucket.grant_read_write(addNavlog)
+        return addNavlog
+
+    def create_lambda_function(
+        self,
+        function_name,
+        sql_db,
+        openai_secret,
+        langfuse_secret,
+        lambda_function_props,
+    ):
+        lambda_function = lambda_.Function(
+            self,
+            function_name,
+            handler=f"{function_name.lower()}.lambda_handler",
+            **lambda_function_props,
+        )
+        self.grant_lambda_permissions(
+            lambda_function, sql_db, openai_secret, langfuse_secret
+        )
+        return lambda_function
+
+    def create_api_gateway_dependencies(self):
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
         api_role = iam.Role.from_role_arn(
             self,
@@ -349,6 +261,10 @@ class PythonStack(Stack):
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        return log_group, policy, cors
+
+    def create_api_gateway_resources(self, functions):
+        log_group, policy, cors = self.create_api_gateway_dependencies()
         apiGateway = apigateway.RestApi(
             self,
             "ApiGateway",
@@ -379,34 +295,24 @@ class PythonStack(Stack):
                 ),
             ),
         )
-        self.instrument_with_datadog(
-            [
-                build_articles,
-                getThemes,
-                getArticles,
-                addTheme,
-                delTheme,
-                delRelated,
-                addNavlog,
-            ],
-        )
         api = apiGateway.root.add_resource("api")
-        todos = api.add_resource(
+        navlogs = api.add_resource(
             "navlogs",
             default_cors_preflight_options=cors,
         )
-        todos.add_method(
+        navlogs.add_method(
             "POST",
-            apigateway.LambdaIntegration(addNavlog),
+            apigateway.LambdaIntegration(functions["add_navlog"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
+
         articles = api.add_resource(
             "articles",
             default_cors_preflight_options=cors,
         )
         articles.add_method(
             "GET",
-            apigateway.LambdaIntegration(getArticles),
+            apigateway.LambdaIntegration(functions["get_articles"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
@@ -416,24 +322,24 @@ class PythonStack(Stack):
         )
         themes.add_method(
             "GET",
-            apigateway.LambdaIntegration(getThemes),
+            apigateway.LambdaIntegration(functions["get_themes"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         themes.add_method(
             "POST",
-            apigateway.LambdaIntegration(addTheme),
+            apigateway.LambdaIntegration(functions["add_theme"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
         themes_sub = themes.add_resource("{title}")
         themes_sub.add_method(
             "GET",
-            apigateway.LambdaIntegration(getThemes),
+            apigateway.LambdaIntegration(functions["get_themes"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         themes_sub.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(delTheme),
+            apigateway.LambdaIntegration(functions["del_theme"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
@@ -443,16 +349,110 @@ class PythonStack(Stack):
         themes_sub_related_by_id = themes_sub_related.add_resource("{article_id}")
         themes_sub_related_by_id.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(delRelated),
+            apigateway.LambdaIntegration(functions["del_related"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
+        return apiGateway
 
-        CfnOutput(self, ApiGatewayEndpointStackOutput, value=apiGateway.url)
+    def __init__(
+        self,
+        scope: Construct,
+        construct_id: str,
+        **kwargs,
+    ) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+        self.vpc = ec2.Vpc(self, "AuroraVpc1")
+        self.bastion = ec2.SecurityGroup.from_security_group_id(
+            self,
+            "bastion",
+            security_group_id="sg-0669c97cc65247ecd",
+        )
+        self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
+        self.ddb = self.create_ddb_table()
+        self.openai_secret, self.langfuse_secret = self.create_secrets()
+        (
+            self.bucket,
+            self.reqs_layers,
+            self.lambdas_env,
+        ) = self.create_common_lambda_dependencies(
+            self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
+        )
+        lambda_function_props = {
+            "runtime": lambda_.Runtime.PYTHON_3_9,
+            "code": lambda_.AssetCode.from_asset(
+                path.join(os.getcwd(), "python/lambda")
+            ),
+            "vpc": self.vpc,
+            "layers": self.reqs_layers,
+            "architecture": lambda_.Architecture.ARM_64,
+            "memory_size": 1024,
+            "security_groups": self.sql_db.connections.security_groups,
+            "environment": self.lambdas_env,
+            "tracing": lambda_.Tracing.PASS_THROUGH,
+            "timeout": Duration.seconds(45),
+        }
 
-        CfnOutput(self, ApiGatewayDomainStackOutput, value=apiGateway.url.split("/")[2])
+        self.functions = {
+            "build_articles": self.create_lambda_function(
+                "build_articles",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "get_themes": self.create_lambda_function(
+                "get_themes",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "get_articles": self.create_lambda_function(
+                "get_articles",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "add_theme": self.create_lambda_function(
+                "add_theme",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "del_theme": self.create_lambda_function(
+                "del_theme",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "del_related": self.create_lambda_function(
+                "del_related",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
+            "add_navlog": self.create_add_navlog_function(
+                self.lambdas_env, self.ddb, self.bucket, self.vpc
+            ),
+        }
+        self.instrument_with_datadog(list(self.functions.values()))
+        self.modify_security_group_for_lambda_access(
+            list(self.functions.values()), self.sql_db
+        )
+        self.apiGateway = self.create_api_gateway_resources(self.functions)
+
+        CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
+
+        CfnOutput(
+            self, ApiGatewayDomainStackOutput, value=self.apiGateway.url.split("/")[2]
+        )
 
         CfnOutput(
             self,
             ApiGatewayStageStackOutput,
-            value=apiGateway.deployment_stage.stage_name,
+            value=self.apiGateway.deployment_stage.stage_name,
         )

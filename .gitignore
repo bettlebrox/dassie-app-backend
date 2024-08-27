@@ -1,4 +1,6 @@
 .venv/
+bin/
+lib/
 cdk.out/
 python/__pycache__/
 test_unit_coverage.xml
@@ -25,3 +27,4 @@ python/lambda/local.json
 pytestdebug.log
 backup.sql
 .backup.sql.swp
+node_modules

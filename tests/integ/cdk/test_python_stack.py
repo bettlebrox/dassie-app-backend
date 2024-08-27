@@ -1,12 +1,11 @@
+import os
+import sys
 import aws_cdk as core
 import aws_cdk.assertions as assertions
-import sys
-import os
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python")
 )
-
 from python_stack import PythonStack
 
 

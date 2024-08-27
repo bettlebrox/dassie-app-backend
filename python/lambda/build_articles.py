@@ -1,10 +1,7 @@
 from datetime import datetime, timedelta
 import logging
-import os
 
 from lambda_init_context import LambdaInitContext
-from services.articles_service import ArticlesService
-from services.navlogs_service import NavlogService
 
 logger = logging.getLogger("build_articles")
 logger.setLevel(logging.DEBUG)
