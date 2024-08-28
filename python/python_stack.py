@@ -113,6 +113,7 @@ class PythonStack(Stack):
                 self.lambdas_env, self.ddb, self.bucket, self.vpc
             ),
         }
+        self.ddb.grant_read_data(self.functions["build_articles"])
         self.instrument_with_datadog(list(self.functions.values()))
         self.modify_security_group_for_lambda_access(
             list(self.functions.values()), self.sql_db
@@ -421,7 +422,7 @@ class PythonStack(Stack):
             self,
             "BuildArticlesScheduleRule",
             schedule=events.Schedule.cron(
-                minute="0", hour="2", month="*", week_day="*", year="*"
+                minute="27", hour="8-21", month="*", week_day="*", year="*"
             ),
         )
 

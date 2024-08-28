@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import aws_cdk as core
@@ -96,7 +97,7 @@ def test_scheduled_event_created():
 
     template.resource_count_is("AWS::Events::Rule", 1)
     template.has_resource_properties(
-        "AWS::Events::Rule", {"ScheduleExpression": "cron(0 2 ? * * *)"}
+        "AWS::Events::Rule", {"ScheduleExpression": "cron(27 8-21 ? * * *)"}
     )
 
 
@@ -110,3 +111,84 @@ def test_resources_created():
     template.resource_count_is("AWS::DynamoDB::Table", 1)
 
     template.resource_count_is("AWS::ApiGateway::RestApi", 1)
+
+
+def test_build_articles_has_ddb_read_permission():
+    app = core.App()
+    stack = PythonStack(app, "python")
+    template = assertions.Template.from_stack(stack)
+
+    # with open("template_output.json", "w") as f:
+    #    json.dump(template.to_json(), f, indent=2)
+
+    template.has_resource_properties(
+        "AWS::IAM::Policy",
+        {
+            "PolicyDocument": {
+                "Statement": assertions.Match.array_with(
+                    [
+                        assertions.Match.object_like(
+                            {
+                                "Action": assertions.Match.any_value(),
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                        assertions.Match.object_like(
+                            {
+                                "Action": assertions.Match.any_value(),
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                        assertions.Match.object_like(
+                            {
+                                "Action": assertions.Match.any_value(),
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                        assertions.Match.object_like(
+                            {
+                                "Action": assertions.Match.any_value(),
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                        assertions.Match.object_like(
+                            {
+                                "Action": assertions.Match.any_value(),
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                        assertions.Match.object_like(
+                            {
+                                "Action": [
+                                    "dynamodb:BatchGetItem",
+                                    "dynamodb:GetRecords",
+                                    "dynamodb:GetShardIterator",
+                                    "dynamodb:Query",
+                                    "dynamodb:GetItem",
+                                    "dynamodb:Scan",
+                                    "dynamodb:ConditionCheckItem",
+                                    "dynamodb:DescribeTable",
+                                ],
+                                "Effect": "Allow",
+                                "Resource": assertions.Match.any_value(),
+                            }
+                        ),
+                    ]
+                )
+            },
+            "Roles": assertions.Match.array_with(
+                [
+                    {
+                        "Ref": assertions.Match.string_like_regexp(
+                            "buildarticlesServiceRole*"
+                        )
+                    }
+                ]
+            ),
+        },
+    )
