@@ -55,11 +55,13 @@ def test_create_article(session):
 
     # Retrieve the article from the database
     retrieved_article = (
-        session.query(Article).filter_by(_title=quote_plus("Test Article")).first()
+        session.query(Article)
+        .filter_by(_title=quote_plus("Test Article").lower())
+        .first()
     )
 
     # Check if the retrieved article matches the original article
-    assert retrieved_article._title == quote_plus("Test Article")
+    assert retrieved_article._title == quote_plus("Test Article").lower()
     assert retrieved_article._summary == "This is a test article"
     assert retrieved_article._url == "https://example.com"
     assert isinstance(retrieved_article._created_at, datetime)
@@ -101,7 +103,9 @@ def test_associate_article_with_theme(session):
 
     # Retrieve the associated theme from the article
     retrieved_article = (
-        session.query(Article).filter_by(_title=quote_plus("Test Article")).first()
+        session.query(Article)
+        .filter_by(_title=quote_plus("Test Article").lower())
+        .first()
     )
 
     # Check if the retrieved theme matches the original theme
@@ -163,11 +167,12 @@ def test_article_title_encoding(session):
     session.commit()
 
     retrieved_article = (
-        session.query(Article).filter_by(_title=quote_plus("Test & Article")).first()
+        session.query(Article)
+        .filter_by(_title=quote_plus("Test & Article").lower())
+        .first()
     )
 
-    assert retrieved_article._title == quote_plus("Test & Article")
-    assert retrieved_article.title == "Test+%26+Article"
+    assert retrieved_article._title == quote_plus("Test & Article").lower()
     assert retrieved_article.original_title == "Test & Article"
 
 
@@ -199,11 +204,11 @@ def test_article_without_summary(session):
 
     retrieved_article = (
         session.query(Article)
-        .filter_by(_title=quote_plus("No Summary Article"))
+        .filter_by(_title=quote_plus("No Summary Article").lower())
         .first()
     )
 
-    assert retrieved_article._title == quote_plus("No Summary Article")
+    assert retrieved_article._title == quote_plus("No Summary Article").lower()
     assert retrieved_article._summary is None
     assert retrieved_article._url == "https://example.com/no-summary"
 

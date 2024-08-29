@@ -33,7 +33,7 @@ class Article(Base):
         logged_at: datetime = None,
         text: str = None,
     ):
-        self._title = quote_plus(original_title)
+        self._title = quote_plus(original_title.lower())
         self._summary = summary
         self._url = url
         self._logged_at = logged_at
@@ -80,7 +80,7 @@ class Article(Base):
 
     @property
     def original_title(self):
-        return unquote_plus(self._title)
+        return unquote_plus(self._title).title()
 
     @original_title.setter
     def original_title(self, value):
@@ -124,7 +124,7 @@ class Article(Base):
 
     @property
     def original_title(self):
-        return unquote_plus(self._title)
+        return unquote_plus(self._title).title()
 
     @property
     def text(self):

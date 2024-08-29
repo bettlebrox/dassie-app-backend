@@ -1,4 +1,6 @@
-from repos import ArticleRepository, BrowseRepository, BrowsedRepository
+from repos import BrowsedRepository
+from browse_repo import BrowseRepository
+from article_repo import ArticleRepository
 from services.articles_service import ArticlesService
 from services.navlogs_service import NavlogService
 from services.openai_client import OpenAIClient

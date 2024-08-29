@@ -22,7 +22,7 @@ and saves it to DynamoDB. Returns 201 on success, 400 for bad requests, or 500 o
 
 def lambda_handler(event, context):
     try:
-        logger.info("Event: {}".format(event))
+        logger.info("event")
         identity = "unauthorized"
         if (
             "requestContext" in event
@@ -30,7 +30,7 @@ def lambda_handler(event, context):
             and "cognitoIdentityId" in event["requestContext"]["identity"]
         ):
             token = event["requestContext"]["identity"]["cognitoIdentityId"]
-            logger.info("requestContext : {}".format(token))
+            logger.debug(msg="requestContext")
             identity = token.replace(":", "_")
         table_name = os.getenv("DDB_TABLE")
         bucket_name = os.getenv("BUCKET_NAME")
@@ -38,18 +38,16 @@ def lambda_handler(event, context):
             raise Exception("Table name missing")
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
-        logger.info("Adding navlog to table: {}".format(table_name))
+        logger.info(msg="Adding navlog to table")
         try:
             payload = json.loads(event["body"])
         except Exception as error:
-            logger.error(
-                "error: {}".format(error.msg if type(error) == ValueError else error)
-            )
+            logger.error(msg="Bad Request")
             return {"statusCode": 400, "body": json.dumps({"message": "Bad Request"})}
         keys = payload.keys()
         missing_keys = [x for x in REQUIRED_KEYS if x not in keys]
         if len(missing_keys) > 0:
-            logger.error("Missing required keys: {}".format(missing_keys))
+            logger.error(msg="Missing required keys")
             return {
                 "statusCode": 400,
                 "body": json.dumps(
@@ -71,6 +69,9 @@ def lambda_handler(event, context):
                 payload["body_text"] if payload["type"] == "content" else None
             ),
             "url": payload["url"],
+            "ttl": int(
+                (datetime.datetime.now() + datetime.timedelta(days=90)).timestamp()
+            ),
         }
         if "image" in payload:
             image_key = save_to_s3(
@@ -78,13 +79,13 @@ def lambda_handler(event, context):
             )
             navlog["image"] = image_key
         ddb_response = ddb_table.put_item(Item=navlog)
-        logger.info("DDB Response: {}".format(ddb_response))
+        logger.debug(msg="DDB Response")
         response = {"statusCode": 201, "body": json.dumps(navlog)}
-        logger.info("Response: %s", response)
+        logger.info(msg="Response")
         return response
 
     except Exception as error:
-        logger.error("Error: {}".format(error))
+        logger.error(msg="Error", exc_info=True)
         return {"statusCode": 500, "body": {"message": error}}
 
 
@@ -103,4 +104,4 @@ def save_to_s3(
         s3.upload_fileobj(io.BytesIO(binary), bucket_name, key)
         return f"s3://{bucket_name}/{key}"
     except Exception as error:
-        logger.error(f"Error: {error}", exc_info=True)
+        logger.error(message="Error", error=error, exc_info=True)

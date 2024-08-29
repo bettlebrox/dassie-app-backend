@@ -4,7 +4,6 @@ import uuid
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime
 from sqlalchemy.dialects.postgresql import UUID
-from urllib.parse import quote_plus
 from sqlalchemy.orm import relationship
 
 Base = declarative_base()

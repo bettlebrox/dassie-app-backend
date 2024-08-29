@@ -36,6 +36,9 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
                 response["body"] = theme.json(related=True)
                 return response
         # return all themes
+        logger.info(
+            f"get_themes: sort_field: {sort_field}, source: {source}, max: {max}"
+        )
         if sort_field == "count_association":
             result = theme_repo.get_top(max, source)
         elif sort_field == "updated_at":

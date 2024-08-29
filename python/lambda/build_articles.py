@@ -1,10 +1,9 @@
-from datetime import datetime, timedelta
 import logging
-
+from datetime import datetime, timedelta
 from lambda_init_context import LambdaInitContext
 
-logger = logging.getLogger("build_articles")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 init_context = None
 
@@ -16,7 +15,7 @@ def lambda_handler(
     navlog_service=None,
     useGlobal=True,
 ):
-    logger.debug("Event: {} Context: {}".format(event, context))
+    logger.debug(event=event, context=context)
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     global init_context
     if init_context is None or not useGlobal:
@@ -37,12 +36,12 @@ def lambda_handler(
             ):
                 skipped += 1
                 continue
-            logger.debug("Processing navlog: {}".format(navlog))
+            logger.debug(navlog=navlog)
             count += 1
-            article_service.process_navlog(navlog)
+            init_context.article_service.process_navlog(navlog)
         except Exception as error:
-            logger.error("Exception: {}".format(error))
+            logger.exception("Error processing navlog", error=error, navlog=navlog)
             response["statusCode"] = 400
             response["body"] = {"message": str(error)}
-        logger.debug(f"Attempted to process {count} navlogs, skipped {skipped}")
+        logger.debug(count=count, skipped=skipped)
     return response

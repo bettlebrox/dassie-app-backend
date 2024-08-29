@@ -1,7 +1,7 @@
 import json
 from os import path
 import os
-from aws_cdk import Stack, CfnOutput, Duration
+from aws_cdk import Fn, Stack, CfnOutput, Duration
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_lambda_python_alpha as lambda_python
@@ -16,6 +16,7 @@ import aws_cdk.aws_iam as iam
 import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
+from python.python_dependencies_stack import PythonDependenciesStack
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -32,17 +33,25 @@ class PythonStack(Stack):
         self,
         scope: Construct,
         construct_id: str,
+        python_dependencies_stack: PythonDependenciesStack,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        self.vpc = ec2.Vpc(self, "AuroraVpc1")
+        self.python_dependencies_stack = python_dependencies_stack
+
+        # Create the VPC with the NAT provider
+        self.vpc = ec2.Vpc(
+            self,
+            "AuroraVpc1",
+        )
+
         self.bastion = ec2.SecurityGroup.from_security_group_id(
             self,
             "bastion",
             security_group_id="sg-0669c97cc65247ecd",
         )
         self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
-        self.ddb = self.create_ddb_table()
+        self.ddb, self.archive_navlog = self.create_ddb_table()
         self.openai_secret, self.langfuse_secret = self.create_secrets()
         (
             self.bucket,
@@ -114,7 +123,9 @@ class PythonStack(Stack):
             ),
         }
         self.ddb.grant_read_data(self.functions["build_articles"])
-        self.instrument_with_datadog(list(self.functions.values()))
+        functions_to_dd_instrument = list(self.functions.values())
+        functions_to_dd_instrument.append(self.archive_navlog)
+        self.instrument_with_datadog(functions_to_dd_instrument)
         self.modify_security_group_for_lambda_access(
             list(self.functions.values()), self.sql_db
         )
@@ -195,6 +206,8 @@ class PythonStack(Stack):
                 name="id", type=dynamodb.AttributeType.STRING
             ),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            time_to_live_attribute="ttl",
+            stream=dynamodb.StreamViewType.OLD_IMAGE,  # Enable DynamoDB Streams
         )
         ddb.add_global_secondary_index(
             partition_key=dynamodb.Attribute(
@@ -202,7 +215,55 @@ class PythonStack(Stack):
             ),
             index_name="type-index",
         )
-        return ddb
+
+        # Create an S3 bucket for archiving old DynamoDB items
+        archive_bucket = s3.Bucket(
+            self,
+            "ArchiveBucket",
+            versioned=True,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            lifecycle_rules=[
+                s3.LifecycleRule(
+                    transitions=[
+                        s3.Transition(
+                            storage_class=s3.StorageClass.GLACIER,
+                            transition_after=Duration.days(365),
+                        )
+                    ]
+                )
+            ],
+        )
+
+        # Create a Lambda function to archive deleted items
+        archive_function = lambda_.Function(
+            self,
+            "ArchiveFunction",
+            runtime=lambda_.Runtime.PYTHON_3_9,
+            handler="archive_navlog.lambda_handler",
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            architecture=lambda_.Architecture.ARM_64,
+            environment={
+                "BUCKET_NAME": archive_bucket.bucket_name,
+            },
+            timeout=Duration.minutes(1),
+        )
+
+        # Grant the Lambda function read permissions to DynamoDB Stream and write permissions to S3
+        ddb.grant_stream_read(archive_function)
+        archive_bucket.grant_write(archive_function)
+
+        # Create an event source mapping to trigger the Lambda function from the DynamoDB stream
+        lambda_.EventSourceMapping(
+            self,
+            "ArchiveFunctionEventSourceMapping",
+            target=archive_function,
+            event_source_arn=ddb.table_stream_arn,
+            starting_position=lambda_.StartingPosition.TRIM_HORIZON,
+            batch_size=100,
+            max_batching_window=Duration.minutes(5),
+        )
+
+        return ddb, archive_function
 
     def create_secrets(self):
         openai_secret = secretsmanager.Secret.from_secret_complete_arn(
@@ -229,17 +290,17 @@ class PythonStack(Stack):
         reqs_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayer",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:40",
+            layer_version_arn=self.python_dependencies_stack.layer_arn,
         )
         reqs_layer_1 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended6C14504C:5",
+            layer_version_arn=self.python_dependencies_stack.layer_arn_1,
         )
         reqs_layer_2 = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended1",
-            layer_version_arn="arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayerExtended2C853E8AE:6",
+            layer_version_arn=self.python_dependencies_stack.layer_arn_2,
         )
         lambdas_env = {
             "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
@@ -265,12 +326,12 @@ class PythonStack(Stack):
     def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
         addNavlog = lambda_.Function(
             self,
-            "addNavLog",
+            "addnavlog",
             runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
-            timeout=Duration.seconds(5),
+            timeout=Duration.seconds(10),
             vpc=vpc,
             environment=lambdas_env,
         )
@@ -428,50 +489,3 @@ class PythonStack(Stack):
 
         # Add the Lambda function as a target for this rule
         rule.add_target(targets.LambdaFunction(build_articles_function))
-
-
-class PythonDependenciesStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        super().__init__(scope, construct_id, **kwargs)
-        reqs_layer = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayer",
-            entry="python/layer",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer",
-        )
-        reqs_layer_1 = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayerExtended",
-            entry="python/layer1",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
-        )
-        reqs_layer_2 = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayerExtended2",
-            entry="python/layer2",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput,
-            value=reqs_layer.layer_version_arn,
-            export_name="PythonLayerStackARN",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput1,
-            value=reqs_layer_1.layer_version_arn,
-            export_name="PythonLayerStackARN1",
-        )
-        CfnOutput(
-            self,
-            PythonLayerStackOutput2,
-            value=reqs_layer_2.layer_version_arn,
-            export_name="PythonLayerStackARN2",
-        )

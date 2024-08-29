@@ -26,6 +26,9 @@ class ArticlesService:
                 navlog["title"],
                 navlog["url"],
                 text=navlog["body_text"],
+                logged_at=datetime.strptime(
+                    navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f"
+                ),
             )
         )
         if article.summary == "" or article.created_at < datetime.now() - timedelta(
@@ -57,8 +60,8 @@ class ArticlesService:
             self._theme_repo.add_related(current_article, article_summary["themes"])
 
     def get_search_terms_from_article(self, article):
-        if article.title.endswith("- Google Search"):
-            return article.title.split(" - Google Search")[0]
+        if article.original_title.endswith("- Google Search"):
+            return article.original_title.split("- Google Search")[0].strip()
         return None
 
     def _track_browsing(self, article, navlog):

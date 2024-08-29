@@ -1,8 +1,9 @@
-import json
 import os
 import sys
 import aws_cdk as core
 import aws_cdk.assertions as assertions
+from unittest.mock import MagicMock
+import pytest
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../../python")
@@ -10,42 +11,61 @@ sys.path.append(
 from python_stack import PythonStack
 
 
-def test_vpc_created():
+@pytest.fixture
+def python_dependencies_stack():
+    mock_stack = MagicMock()
+    mock_stack.layer_arn = "layer_arn"
+    mock_stack.layer_arn_1 = "layer_arn_1"
+    mock_stack.layer_arn_2 = "layer_arn_2"
+    return mock_stack
+
+
+def test_vpc_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     template.resource_count_is("AWS::EC2::VPC", 1)
 
 
-def test_rds_instance_created():
+def test_rds_instance_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     template.resource_count_is("AWS::RDS::DBCluster", 1)
 
 
-def test_s3_bucket_created():
+def test_s3_bucket_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
-    template.resource_count_is("AWS::S3::Bucket", 1)
+    template.resource_count_is("AWS::S3::Bucket", 2)
 
 
-def test_secrets_created():
+def test_secrets_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
     template.resource_count_is(
         "AWS::SecretsManager::Secret", 1
     )  # this is the DB secret
 
 
-def test_api_gateway_methods():
+def test_api_gateway_methods(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     template.has_resource_properties(
@@ -69,9 +89,11 @@ def test_api_gateway_methods():
     )
 
 
-def test_lambda_environment_variables():
+def test_lambda_environment_variables(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     template.has_resource_properties(
@@ -90,9 +112,11 @@ def test_lambda_environment_variables():
     )
 
 
-def test_scheduled_event_created():
+def test_scheduled_event_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     template.resource_count_is("AWS::Events::Rule", 1)
@@ -101,21 +125,25 @@ def test_scheduled_event_created():
     )
 
 
-def test_resources_created():
+def test_resources_created(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
-    template.resource_count_is("AWS::Lambda::Function", 7)
+    template.resource_count_is("AWS::Lambda::Function", 8)
 
     template.resource_count_is("AWS::DynamoDB::Table", 1)
 
     template.resource_count_is("AWS::ApiGateway::RestApi", 1)
 
 
-def test_build_articles_has_ddb_read_permission():
+def test_build_articles_has_ddb_read_permission(python_dependencies_stack):
     app = core.App()
-    stack = PythonStack(app, "python")
+    stack = PythonStack(
+        app, "python", python_dependencies_stack=python_dependencies_stack
+    )
     template = assertions.Template.from_stack(stack)
 
     # with open("template_output.json", "w") as f:

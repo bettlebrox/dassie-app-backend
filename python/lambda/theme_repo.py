@@ -58,6 +58,7 @@ class ThemeRepository(BasePostgresRepository):
             return query.order_by(self.model._updated_at.desc()).limit(limit)
 
     def get_top(self, limit: int = 10, source: ThemeType = None, days: int = 0):
+        logger.info(f"get_top: limit: {limit}, source: {source}, days: {days}")
         with closing(self._session()) as session:
             join_query = session.query(
                 self.model, func.count(Association.article_id)

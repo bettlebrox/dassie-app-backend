@@ -6,7 +6,7 @@ from sqlalchemy import func
 from models.article import Article
 from models.models import Browsed
 from models.theme import Theme
-from repos import ArticleRepository
+from article_repo import ArticleRepository
 
 
 @pytest.fixture
@@ -304,7 +304,7 @@ def test_get_article_by_id():
     article = repo.get_by_id(1)
 
     # Assert the result
-    assert article._title == quote_plus("Test Article")
+    assert article._title == quote_plus("Test Article").lower()
 
 
 def test_get_all_articles():
@@ -331,8 +331,8 @@ def test_get_all_articles():
     articles = repo.get_all()
 
     # Assert the result
-    assert articles[0]._title == quote_plus("Test Article 1")
-    assert articles[1]._title == quote_plus("Test Article 2")
+    assert articles[0]._title == quote_plus("Test Article 1").lower()
+    assert articles[1]._title == quote_plus("Test Article 2").lower()
 
 
 def test_get_default_params(article_repo, mock_simple_order_by, mock_simple_limit):
