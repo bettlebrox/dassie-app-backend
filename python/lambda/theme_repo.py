@@ -1,7 +1,8 @@
 from models.models import Association, Browsed, Recurrent, Sporadic
 from models.article import Article
 from models.theme import Theme, ThemeType
-from repos import BasePostgresRepository, logger
+from repos import BasePostgresRepository
+from dassie_logger import logger
 
 
 from sqlalchemy import func
@@ -33,7 +34,9 @@ class ThemeRepository(BasePostgresRepository):
                 .group_by(Article._id)
                 .all()
             )
-            logger.debug(f"found browsed_articles: {len(browsed_articles)}")
+            logger.info(
+                "found browsed_articles", extra={"count": len(browsed_articles)}
+            )
             return (
                 session.query(self.model)
                 .join(Association)
@@ -58,7 +61,14 @@ class ThemeRepository(BasePostgresRepository):
             return query.order_by(self.model._updated_at.desc()).limit(limit)
 
     def get_top(self, limit: int = 10, source: ThemeType = None, days: int = 0):
-        logger.info(f"get_top: limit: {limit}, source: {source}, days: {days}")
+        logger.debug(
+            "get_top",
+            extra={
+                "limit": limit,
+                "source": source,
+                "days": days,
+            },
+        )
         with closing(self._session()) as session:
             join_query = session.query(
                 self.model, func.count(Association.article_id)
@@ -79,10 +89,13 @@ class ThemeRepository(BasePostgresRepository):
                 func.count(Association.article_id).desc()
             )
             query = query.limit(limit).with_entities(self.model)
-            logger.info(
-                "query :{}".format(
-                    query.statement.compile(compile_kwargs={"literal_binds": True})
-                )
+            logger.debug(
+                "get_topquery",
+                extra={
+                    "query": query.statement.compile(
+                        compile_kwargs={"literal_binds": True}
+                    )
+                },
             )
             return query
 
@@ -140,7 +153,10 @@ class ThemeRepository(BasePostgresRepository):
                 if theme is None:
                     theme = Theme(theme_title)
                     session.add(theme)
-                    logger.debug(f"Adding new theme: {theme.title}")
+                    logger.debug(
+                        "Adding new theme",
+                        extra={"theme": theme.title},
+                    )
                     session.commit()
                 association = Association(article.id, theme._id)
                 duplicate_association = (
@@ -158,9 +174,11 @@ class ThemeRepository(BasePostgresRepository):
                 session.commit()
                 associations.append(association)
                 logger.debug(
-                    "Added association between article {} and theme {}".format(
-                        article.title, theme.title
-                    )
+                    "Added association between article and theme",
+                    extra={
+                        "article": article.title,
+                        "theme": theme.title,
+                    },
                 )
             return associations
 

@@ -15,9 +15,13 @@ def navlog_service():
     return MagicMock()
 
 
-def test_build_articles_success(article_service, navlog_service):
+@pytest.fixture(scope="function")
+def mock_context():
+    return MagicMock()
+
+
+def test_build_articles_success(article_service, navlog_service, mock_context):
     event = {}
-    context = {}
 
     navlog = {
         "body_text": "This is a test body text that is long enough to be processed. this must be longer than 100 characters",
@@ -28,7 +32,7 @@ def test_build_articles_success(article_service, navlog_service):
 
     response = lambda_handler(
         event,
-        context,
+        mock_context,
         article_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
@@ -40,9 +44,8 @@ def test_build_articles_success(article_service, navlog_service):
     article_service.process_navlog.assert_called_once_with(navlog)
 
 
-def test_build_articles_skip_short_text(article_service, navlog_service):
+def test_build_articles_skip_short_text(article_service, navlog_service, mock_context):
     event = {}
-    context = {}
 
     navlog = {
         "body_text": "Short",
@@ -53,7 +56,7 @@ def test_build_articles_skip_short_text(article_service, navlog_service):
 
     response = lambda_handler(
         event,
-        context,
+        mock_context,
         article_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
@@ -63,9 +66,8 @@ def test_build_articles_skip_short_text(article_service, navlog_service):
     article_service.process_navlog.assert_not_called()
 
 
-def test_build_articles_skip_old_navlog(article_service, navlog_service):
+def test_build_articles_skip_old_navlog(article_service, navlog_service, mock_context):
     event = {}
-    context = {}
 
     old_date = (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%dT%H:%M:%S.%f")
     navlog = {
@@ -77,7 +79,7 @@ def test_build_articles_skip_old_navlog(article_service, navlog_service):
 
     response = lambda_handler(
         event,
-        context,
+        mock_context,
         article_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
@@ -87,9 +89,8 @@ def test_build_articles_skip_old_navlog(article_service, navlog_service):
     article_service.process_navlog.assert_not_called()
 
 
-def test_build_articles_error_handling(article_service, navlog_service):
+def test_build_articles_error_handling(article_service, navlog_service, mock_context):
     event = {}
-    context = {}
 
     navlog = {
         "body_text": "This is a test body text that is long enough to be processed. this must be longer than 100 characters",
@@ -101,7 +102,7 @@ def test_build_articles_error_handling(article_service, navlog_service):
 
     response = lambda_handler(
         event,
-        context,
+        mock_context,
         article_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,

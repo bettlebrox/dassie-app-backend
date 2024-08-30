@@ -1,10 +1,7 @@
 import json
-import logging
 import os
 import boto3
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 """
 lambda_handler is the entry point for the Lambda function.
@@ -19,25 +16,25 @@ error message.
 
 def lambda_handler(event, context):
     try:
-        logger.info("Event: {}".format(event))
+        logger.debug("get_navlogs")
         table_name = os.getenv("DDB_TABLE")
         bucket_name = os.getenv("BUCKET_NAME")
         if not table_name:
             raise Exception("Table name missing")
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
-        logger.info("Scanning table: {}".format(table_name))
+        logger.debug("Scanning table", extra={"table_name": table_name})
         items = ddb_table.scan()
-        logger.info("DDB Response: {}".format(items))
+        logger.debug("DDB Response", extra={"items": items})
         if "Items" in items:
             navlogs = add_presigned_urls(items["Items"], bucket_name)
             response = {"statusCode": 200, "body": json.dumps(navlogs)}
         else:
             response = {"statusCode": items["HTTPStatusCode"]}
-        logger.info("Response: %s", response)
+        logger.debug("Response", extra={"response": response})
         return response
     except Exception as error:
-        logger.info("Error: {}".format(error))
+        logger.exception("Error")
         return {"statusCode": 500, "body": {"message": error}}
 
 
@@ -54,5 +51,5 @@ def add_presigned_urls(navlogs, bucket_name):
                     },
                 )
             except Exception as error:
-                logger.error(f"Error getting presigned url {error}", exc_info=True)
+                logger.exception("Error getting presigned url", extra={"error": error})
     return navlogs

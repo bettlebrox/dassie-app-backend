@@ -10,14 +10,9 @@ from tqdm.auto import tqdm
 import boto3
 import json
 import os
-import logging
+from aws_lambda_powertools import Logger
 
-LOG_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-logger = logging.getLogger()
-handler = logging.FileHandler("/tmp/sumit_long.log")
-handler.setFormatter(logging.Formatter(LOG_FORMAT))
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger = Logger(service="sumit", log_record_order=["message"])
 
 
 def main():
@@ -69,7 +64,9 @@ def main():
                 continue
             article_service.process_navlog(navlog)
         except Exception as error:
-            logger.error(f"{error} navlog:{navlog}", exc_info=True)
+            logger.exception(
+                f"Error processing navlog", extra={"navlog": navlog, "error": error}
+            )
 
 
 if __name__ == "__main__":

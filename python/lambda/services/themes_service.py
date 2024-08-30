@@ -1,12 +1,8 @@
-from functools import reduce
-import logging
 from urllib.parse import quote_plus
-
+from dassie_logger import logger
 from models.theme import Theme, ThemeType
 from services.openai_client import LLMResponseException
 
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
 CONTEXT_WINDOW_SIZE = 15000
 
 
@@ -19,7 +15,13 @@ class ThemesService:
     def build_related_from_title(self, theme):
         embedding = self.openai_client.get_embedding(theme.title)
         theme.related = self.article_repo.get_by_theme_embedding(embedding)
-        logger.info(f"Found {len(theme.related)} related articles")
+        logger.info(
+            "Found related articles",
+            extra={
+                "theme": theme.title,
+                "count": len(theme.related),
+            },
+        )
 
     def upsert_theme_from_summary(
         self,
@@ -49,18 +51,36 @@ class ThemesService:
             theme.related is None or len(theme.related) == 0
         ):
             theme.related = self.article_repo.get_by_theme_embedding(theme.embedding)
-            logger.info(f"Found {len(theme.related)} related articles")
+            logger.debug(
+                "Found related articles",
+                extra={
+                    "theme": theme.title,
+                    "count": len(theme.related),
+                },
+            )
         elif related_articles is not None:
             theme.related = related_articles
         theme = self.theme_repo.upsert(theme)
         theme = self.theme_repo.get_by_id(theme.id)
-        logger.info("Added theme: {}".format(theme.id))
+        logger.info("Added theme", extra={"theme": theme.title})
         theme.sporadic = self.build_related_themes(theme, summary, False)
-        logger.info(f"Sporadic themes {[(t.id,t.title) for t in theme.sporadic]}")
+        logger.debug(
+            "Sporadic themes",
+            extra={
+                "theme": theme.title,
+                "themes": [(t.id, t.title) for t in theme.sporadic],
+            },
+        )
         theme.recurrent = self.build_related_themes(theme, summary, True)
-        logger.info(f"Recurrent themes {[(t.id,t.title) for t in theme.recurrent]}")
+        logger.debug(
+            "Recurrent themes",
+            extra={
+                "theme": theme.title,
+                "themes": [(t.id, t.title) for t in theme.recurrent],
+            },
+        )
         self.theme_repo.update(theme)
-        logger.info("Updated theme with relations: {}".format(theme.title))
+        logger.debug("Updated theme with relations", extra={"theme": theme.title})
         return theme
 
     def build_related_themes(self, current_theme, summary, recurrent):
@@ -88,14 +108,20 @@ class ThemesService:
                 existing_related_themes.append(related_theme)
             return existing_related_themes
         except Exception as error:
-            logger.error(f"build_related_themes Error: {error}", exc_info=True)
+            logger.exception("build_related_themes Error")
             return []
 
     def build_theme_from_related_articles(
         self, articles, theme_type, original_title=None, given_embedding=None
     ):
         total_tokens = sum([a.token_count for a in articles])
-        logger.info(f"Got {len(articles)} articles with { total_tokens } total tokens")
+        logger.info(
+            "Got articles",
+            extra={
+                "count": len(articles),
+                "total_tokens": total_tokens,
+            },
+        )
         theme = None
         try:
             if total_tokens <= CONTEXT_WINDOW_SIZE:
@@ -124,7 +150,11 @@ class ThemesService:
                     art_text = art_text[: len(art_text) // 2]
                     article_size = self.openai_client.count_tokens(art_text)
                     logger.debug(
-                        f"window size: {window_size}, target article window size:{article_window_size}. Reducing article size to {len(art_text)} token size {article_size}"
+                        "Reducing article size",
+                        extra={
+                            "article_size": article_size,
+                            "article_window_size": article_window_size,
+                        },
                     )
                 window.append(art_text)
                 window_size = window_size + article_size
@@ -133,7 +163,11 @@ class ThemesService:
                     or len(articles) == i + 1
                 ):
                     logger.debug(
-                        f"Posting, articles processed:{i} window size: {window_size}"
+                        "Posting",
+                        extra={
+                            "articles_processed": i,
+                            "window_size": window_size,
+                        },
                     )
                     summary = self.openai_client.get_theme_summarization(window)
                     if summary is not None:
@@ -147,10 +181,14 @@ class ThemesService:
                     return theme
                 else:
                     logger.debug(
-                        f"Window not full, articles processed:{i} window size: {window_size}"
+                        "Window not full",
+                        extra={
+                            "articles_processed": i,
+                            "window_size": window_size,
+                        },
                     )
             return theme
         except LLMResponseException as error:
             raise error
         except Exception as error:
-            logger.error("Error: {}".format(error), exc_info=True)
+            logger.exception("Error building theme from related articles")

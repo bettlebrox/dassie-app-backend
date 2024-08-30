@@ -1,17 +1,17 @@
-import logging
 from urllib.parse import quote_plus, unquote_plus
-import boto3
-from lambda_init_context import LambdaInitContext
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-secretsmanager = boto3.client("secretsmanager")
+from aws_lambda_powertools.logging import correlation_paths
+from lambda_init_context import LambdaInitContext
+from dassie_logger import logger
 
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(event, context, theme_repo=None):
-    logger.info("Event: {} Context: {}".format(event, context))
+    logger.debug("gel_theme")
     global init_context
     if init_context is None:
         init_context = LambdaInitContext(theme_repo=theme_repo)
@@ -19,7 +19,7 @@ def lambda_handler(event, context, theme_repo=None):
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         title = quote_plus(unquote_plus(event["pathParameters"]["title"].lower()))
-        logger.info(f"Attempting to delete theme title: {title}")
+        logger.debug(f"Attempting to delete theme title", extra={"title": title})
         if title != "themes":
             theme = theme_repo.get_by_title(title)
             if theme is None:
@@ -28,7 +28,7 @@ def lambda_handler(event, context, theme_repo=None):
                 return response
             theme_repo.delete(theme)
     except Exception as error:
-        logger.error("Error: {}".format(error), exc_info=True)
+        logger.exception("Error")
         response["statusCode"] = 500
         response["body"] = {"message": str(error)}
     return response

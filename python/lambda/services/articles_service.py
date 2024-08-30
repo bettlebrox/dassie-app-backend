@@ -1,10 +1,8 @@
-import logging
 from datetime import datetime, timedelta
+from dassie_logger import logger
 
 from models.models import Browse, Browsed
 from models.article import Article
-
-logger = logging.getLogger()
 
 
 class ArticlesService:
@@ -41,7 +39,7 @@ class ArticlesService:
                 self._llm_client.get_embedding(article.text),
                 self._llm_client.count_tokens(article.text),
             )
-            logger.info("Built article {}".format(article.title))
+            logger.info("Built article", extra={"title": article.title})
         self._track_browsing(article, navlog)
 
     def _add_llm_summarisation(
@@ -49,7 +47,7 @@ class ArticlesService:
     ):
         if article_summary is None:
             return
-        logger.debug(f"Adding article summary: {article_summary}")
+        logger.debug("Adding article summary", extra={"summary": article_summary})
         if "summary" in article_summary and article_summary["summary"] is not None:
             current_article.summary = article_summary["summary"]
             current_article.embedding = embedding

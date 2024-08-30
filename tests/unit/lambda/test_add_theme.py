@@ -25,6 +25,11 @@ def aws_credentials():
 
 
 @pytest.fixture
+def mock_context():
+    return MagicMock()
+
+
+@pytest.fixture
 def create_secret():
     with mock_aws():
         secretsmanager = boto3.client("secretsmanager")
@@ -41,9 +46,8 @@ def create_secret():
 
 
 @mock_aws
-def test_add_theme(aws_credentials, create_secret):
+def test_add_theme(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
-    context = []
     theme_repo = MagicMock()
     article_repo = MagicMock()
     openai_client = MagicMock()
@@ -58,7 +62,7 @@ def test_add_theme(aws_credentials, create_secret):
     theme_repo.get_by_id.return_value = test_theme
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     payload = lambda_handler(
-        event, context, article_repo, openai_client, themes_service, False
+        event, mock_context, article_repo, openai_client, themes_service, False
     )
     assert payload["statusCode"] == 201, f"status code is not 201"
     theme = json.loads(payload["body"])
@@ -67,9 +71,8 @@ def test_add_theme(aws_credentials, create_secret):
 
 
 @mock_aws
-def test_add_theme_error(aws_credentials, create_secret):
+def test_add_theme_error(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
-    context = []
     theme_repo = MagicMock()
     article_repo = MagicMock()
     openai_client = MagicMock()
@@ -83,7 +86,12 @@ def test_add_theme_error(aws_credentials, create_secret):
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
     test_theme = Theme("new theme", "some summary")
     payload = lambda_handler(
-        event, context, article_repo, openai_client, themes_service, useGlobal=False
+        event,
+        mock_context,
+        article_repo,
+        openai_client,
+        themes_service,
+        useGlobal=False,
     )
     assert payload["statusCode"] == 500
     assert json.loads(payload["body"])["message"] == llm_exception.message

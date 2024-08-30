@@ -1,5 +1,3 @@
-import structlog
-import logging
 from datetime import datetime, timedelta
 from theme_repo import ThemeRepository
 from browse_repo import BrowseRepository
@@ -9,22 +7,10 @@ from services.openai_client import LLMResponseException, OpenAIClient
 import boto3
 import json
 import os
-import logging
 from services.themes_service import ThemesService
+from aws_lambda_powertools import Logger
 
-# Configure structured logging
-logging.basicConfig(level=logging.INFO)
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.stdlib.add_log_level,
-        structlog.processors.LogfmtRenderer(),
-    ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-)
-logger = structlog.get_logger()
+logger = Logger(service="themify", log_record_order=["message"])
 
 CONTEXT_WINDOW_SIZE = 16000
 
@@ -66,18 +52,22 @@ def main():
             ):
                 logger.info(
                     "Skipping theme",
-                    theme_title=theme.original_title,
-                    reason="updated_recently",
+                    extra={
+                        "theme_title": theme.original_title,
+                        "reason": "updated_recently",
+                    },
                 )
                 continue
             themes_service.build_theme_from_related_articles(
                 theme.related, ThemeType.TOP, theme.original_title
             )
         except LLMResponseException as e:
-            logger.error(
+            logger.exception(
                 "Failed to build themes from related articles",
-                theme_title=theme.original_title,
-                error=str(e),
+                extra={
+                    "theme_title": theme.original_title,
+                    "error": str(e),
+                },
             )
     recent_browses = browse_repo.get_recently_browsed(days=7)
     for browse in recent_browses:

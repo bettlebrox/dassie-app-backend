@@ -1,13 +1,14 @@
-import logging
 from datetime import datetime, timedelta
 from lambda_init_context import LambdaInitContext
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from aws_lambda_powertools.logging import correlation_paths
+from dassie_logger import logger
 
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(
     event,
     context,
@@ -15,7 +16,7 @@ def lambda_handler(
     navlog_service=None,
     useGlobal=True,
 ):
-    logger.debug(event=event, context=context)
+    logger.debug("build_articles")
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     global init_context
     if init_context is None or not useGlobal:
@@ -36,12 +37,12 @@ def lambda_handler(
             ):
                 skipped += 1
                 continue
-            logger.debug(navlog=navlog)
+            logger.debug("processing navlog", extra={"navlog": navlog})
             count += 1
             init_context.article_service.process_navlog(navlog)
         except Exception as error:
-            logger.exception("Error processing navlog", error=error, navlog=navlog)
+            logger.exception("Error processing navlog")
             response["statusCode"] = 400
             response["body"] = {"message": str(error)}
-        logger.debug(count=count, skipped=skipped)
+    logger.debug("processed", extra={"count": count, "skipped": skipped})
     return response

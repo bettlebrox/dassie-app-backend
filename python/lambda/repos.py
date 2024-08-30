@@ -1,12 +1,7 @@
 from contextlib import closing
-from datetime import datetime, timedelta
-from sqlalchemy import create_engine, func
-from models.models import Browse, Browsed
-from sqlalchemy.orm import sessionmaker, joinedload
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from sqlalchemy import create_engine
+from models.models import Browsed
+from sqlalchemy.orm import sessionmaker
 
 
 class BasePostgresRepository:
@@ -16,7 +11,6 @@ class BasePostgresRepository:
             pool_timeout=10,
         )
         self._session = sessionmaker(bind=engine, expire_on_commit=False)
-        self._logger = logger
         # Base.metadata.create_all(engine)
 
     def get_all(self):

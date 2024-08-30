@@ -2,12 +2,8 @@ from datetime import datetime
 import json
 import boto3
 import os
-import logging
 from botocore.exceptions import ClientError
-
-# Set up logging
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 # Initialize AWS clients
 s3 = boto3.client("s3")
@@ -16,6 +12,9 @@ dynamodb = boto3.client("dynamodb")
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(event, context):
     for record in event["Records"]:
         # Ensure this is a REMOVE event
@@ -51,15 +50,22 @@ def lambda_handler(event, context):
                 ContentType="application/json",
             )
 
-            logger.info(f"Successfully archived item {item_id} to S3")
+            logger.info(
+                f"Successfully archived item {item_id} to S3",
+                extra={"item_id": item_id, "s3_key": s3_key},
+            )
 
         except ClientError as e:
-            logger.error(f"Error archiving item: {str(e)}")
+            logger.exception(
+                f"Error archiving item", extra={"item_id": item_id, "s3_key": s3_key}
+            )
             # Depending on the error, you might want to re-raise to trigger a Lambda retry
             raise
 
         except Exception as e:
-            logger.error(f"Unexpected error: {str(e)}")
+            logger.exception(
+                f"Unexpected error", extra={"item_id": item_id, "s3_key": s3_key}
+            )
             # For unexpected errors, it's often safer to raise and let Lambda retry
             raise
 

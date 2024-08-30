@@ -1,10 +1,7 @@
 import json
 import boto3
 from boto3.dynamodb.conditions import Key
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 
 class NavlogService:
@@ -45,7 +42,7 @@ class NavlogService:
         for navlog in navlogs:
             if "image" in navlog and navlog["image"] is not None:
                 image_key = navlog["image"]
-                bucket_name, key = image_key.replace("s3://", "").split("/", 1)
+                _, key = image_key.replace("s3://", "").split("/", 1)
                 try:
                     navlog["image"] = boto3.client("s3").generate_presigned_url(
                         "get_object",
@@ -54,6 +51,6 @@ class NavlogService:
                             "Key": key,
                         },
                     )
-                except Exception as error:
-                    logger.error(f"Error getting presigned url {error}", exc_info=True)
+                except Exception:
+                    logger.exception("Error getting presigned url")
         return navlogs

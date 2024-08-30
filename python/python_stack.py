@@ -119,7 +119,7 @@ class PythonStack(Stack):
                 lambda_function_props,
             ),
             "add_navlog": self.create_add_navlog_function(
-                self.lambdas_env, self.ddb, self.bucket, self.vpc
+                self.lambdas_env, self.ddb, self.bucket, self.vpc, self.reqs_layers[2]
             ),
         }
         self.ddb.grant_read_data(self.functions["build_articles"])
@@ -287,17 +287,17 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
-        reqs_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
+        postgres_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayer",
             layer_version_arn=self.python_dependencies_stack.layer_arn,
         )
-        reqs_layer_1 = lambda_python.PythonLayerVersion.from_layer_version_arn(
+        ai_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended",
             layer_version_arn=self.python_dependencies_stack.layer_arn_1,
         )
-        reqs_layer_2 = lambda_python.PythonLayerVersion.from_layer_version_arn(
+        utils_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
             self,
             "RequirementsLayerExtended1",
             layer_version_arn=self.python_dependencies_stack.layer_arn_2,
@@ -313,7 +313,7 @@ class PythonStack(Stack):
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
         }
-        return bucket, [reqs_layer, reqs_layer_1, reqs_layer_2], lambdas_env
+        return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
 
     def modify_security_group_for_lambda_access(self, functions, sql_db):
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
@@ -323,15 +323,16 @@ class PythonStack(Stack):
                     function.connections.security_groups[0], ec2.Port.tcp(5432)
                 )
 
-    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
+    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc, layer):
         addNavlog = lambda_.Function(
             self,
-            "addnavlog",
+            "add_navlog",
             runtime=lambda_.Runtime.PYTHON_3_9,
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),
+            layers=[layer],
             vpc=vpc,
             environment=lambdas_env,
         )

@@ -1,17 +1,16 @@
 import json
-import logging
-
+from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
 from models.theme import ThemeType
-
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(
     event,
     context,
@@ -21,7 +20,7 @@ def lambda_handler(
     useGlobal=True,
 ):
     try:
-        logger.info("Event: {} Context: {}".format(event, context))
+        logger.info("add_theme")
         response = {"statusCode": 201, "headers": {"Access-Control-Allow-Origin": "*"}}
         global init_context
         if init_context is None or not useGlobal:
@@ -35,12 +34,10 @@ def lambda_handler(
         theme_service = init_context.theme_service
         try:
             payload = json.loads(event["body"])
-            logger.info("Payload: {}".format(payload))
             title = payload["title"]
+            logger.info("attempting to add theme", extra={"title": title})
         except Exception as error:
-            logger.error(
-                "error: {}".format(error.msg if type(error) == ValueError else error)
-            )
+            logger.exception("error attempting to add theme")
             response["body"] = json.dumps({"message": "Bad Request"})
             response["statusCode"] = 400
             return response
@@ -56,7 +53,7 @@ def lambda_handler(
         response["body"] = theme.json()
         return response
     except Exception as error:
-        logger.error("Error: {}".format(error), exc_info=True)
+        logger.exception("Error")
         response["statusCode"] = 500
         response["body"] = json.dumps({"message": str(error)})
         return response

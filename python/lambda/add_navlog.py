@@ -1,14 +1,12 @@
 import json
-import logging
 import os
 import datetime
+from aws_lambda_powertools.logging import correlation_paths
 import boto3
 import uuid
 import base64
 import io
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 REQUIRED_KEYS = ["title", "type", "tabId", "timestamp", "documentId"]
 
@@ -20,9 +18,12 @@ and saves it to DynamoDB. Returns 201 on success, 400 for bad requests, or 500 o
 """
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(event, context):
     try:
-        logger.info("event")
+        logger.info("add_navlog")
         identity = "unauthorized"
         if (
             "requestContext" in event
@@ -30,24 +31,24 @@ def lambda_handler(event, context):
             and "cognitoIdentityId" in event["requestContext"]["identity"]
         ):
             token = event["requestContext"]["identity"]["cognitoIdentityId"]
-            logger.debug(msg="requestContext")
             identity = token.replace(":", "_")
+            logger.debug("got identity", extra={"identity": identity})
         table_name = os.getenv("DDB_TABLE")
         bucket_name = os.getenv("BUCKET_NAME")
         if not table_name:
             raise Exception("Table name missing")
         dynamodb = boto3.resource("dynamodb")
         ddb_table = dynamodb.Table(table_name)
-        logger.info(msg="Adding navlog to table")
+        logger.info("Adding navlog to table")
         try:
             payload = json.loads(event["body"])
         except Exception as error:
-            logger.error(msg="Bad Request")
+            logger.exception("Bad Request")
             return {"statusCode": 400, "body": json.dumps({"message": "Bad Request"})}
         keys = payload.keys()
         missing_keys = [x for x in REQUIRED_KEYS if x not in keys]
         if len(missing_keys) > 0:
-            logger.error(msg="Missing required keys")
+            logger.exception("Missing required keys")
             return {
                 "statusCode": 400,
                 "body": json.dumps(
@@ -79,13 +80,13 @@ def lambda_handler(event, context):
             )
             navlog["image"] = image_key
         ddb_response = ddb_table.put_item(Item=navlog)
-        logger.debug(msg="DDB Response")
+        logger.debug("DDB Response", extra={"ddb_response": ddb_response})
         response = {"statusCode": 201, "body": json.dumps(navlog)}
-        logger.info(msg="Response")
+        logger.info("Response", extra={"response": response})
         return response
 
     except Exception as error:
-        logger.error(msg="Error", exc_info=True)
+        logger.exception("Error")
         return {"statusCode": 500, "body": {"message": error}}
 
 
@@ -104,4 +105,4 @@ def save_to_s3(
         s3.upload_fileobj(io.BytesIO(binary), bucket_name, key)
         return f"s3://{bucket_name}/{key}"
     except Exception as error:
-        logger.error(message="Error", error=error, exc_info=True)
+        logger.exception("Error")

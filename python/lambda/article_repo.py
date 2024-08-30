@@ -6,10 +6,7 @@ from models.models import Association, Browsed
 from models.theme import Theme
 from models.article import Article
 from repos import BasePostgresRepository
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 
 class ArticleRepository(BasePostgresRepository):
@@ -81,7 +78,7 @@ class ArticleRepository(BasePostgresRepository):
             )
             query = self._append_sort_by(query, sort_by, descending, filter_embedding)
             query = query.options(joinedload(self.model._themes))
-            logger.debug("embedding query")
+            logger.debug("embedding query", extra={"query": query})
             return query.limit(limit).all()
 
     def _append_sort_by(self, query, sort_by, descending, filter_embedding=None):

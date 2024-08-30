@@ -40,5 +40,6 @@ python_stack = PythonStack(
     python_dependencies_stack=python_dependencies_stack,
     env=cdk.Environment(account="559845934392", region="eu-west-1"),
 )
+python_stack.add_dependency(python_dependencies_stack)
 
 app.synth()

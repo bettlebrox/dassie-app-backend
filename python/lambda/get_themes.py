@@ -1,15 +1,15 @@
-import logging
 from lambda_init_context import LambdaInitContext
+from dassie_logger import logger
+from aws_lambda_powertools.logging import correlation_paths
 from models.theme import ThemeType
-
-logger = logging.getLogger("get_themes")
-logger.setLevel(logging.DEBUG)
 
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(event, context, theme_repo=None, useGlobal=True):
-    logger.debug("Event: {} Context: {}".format(event, context))
     global init_context
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(theme_repo=theme_repo)
@@ -37,7 +37,8 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
                 return response
         # return all themes
         logger.info(
-            f"get_themes: sort_field: {sort_field}, source: {source}, max: {max}"
+            f"get_themes: sort_field: {sort_field}, source: {source}, max: {max}",
+            extra={"sort_field": sort_field, "source": source, "max": max},
         )
         if sort_field == "count_association":
             result = theme_repo.get_top(max, source)
@@ -49,11 +50,11 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
             raise ValueError("Invalid sort field: {}".format(sort_field))
         response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))
     except ValueError as error:
-        logger.error("ValueError: {}".format(error))
+        logger.error("ValueError: {}".format(error), extra={"error": error})
         response["statusCode"] = 400
         response["body"] = {"message": str(error)}
     except Exception as error:
-        logger.error("Error: {}".format(error), exc_info=True)
+        logger.exception("Error")
         response["statusCode"] = 500
         response["body"] = {"message": str(error)}
     return response

@@ -1,12 +1,9 @@
 import json
 import tiktoken
-import logging
 from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
 from langfuse.openai import OpenAI
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 
 class LLMResponseException(Exception):
@@ -53,20 +50,20 @@ class OpenAIClient:
     def get_embedding(self, article, model="text-embedding-ada-002"):
         article = article.replace("\n", " ")
         try:
-            logger.debug(msg="get_embedding")
+            logger.debug("get_embedding")
             response = self.openai_client.embeddings.create(
                 input=[article],
                 model=model,
             )
             return response.data[0].embedding
         except Exception as error:
-            logger.error(msg="get_embedding error")
+            logger.exception("get_embedding error")
             return None
 
     @observe()
     def get_completion(self, prompt, query, model=MODEL):
         if len(query) < 100:
-            logger.info(msg="query too short")
+            logger.info("query too short")
             return None
         messages = [
             {"role": "system", "content": prompt},
@@ -80,32 +77,22 @@ class OpenAIClient:
                     messages=messages,
                     temperature=self.TEMPERATURE,
                 )
-                logger.info(
-                    msg="get_completion response",
-                )
+                logger.debug("get_completion response")
             except Exception as error:
-                logger.error(
-                    msg="get_completion Error",
-                )
+                logger.exception("get_completion Error")
                 response = error
             return json.loads(response.choices[0].message.content)
         except json.decoder.JSONDecodeError as error:
-            logger.error(
-                msg="get_completion JSON decoding Error",
-                exc_info=True,
-            )
+            logger.exception("get_completion JSON decoding Error")
             raise LLMResponseException(error)
         except Exception as error:
-            logger.error(
-                msg="get_completion Error",
-                exc_info=True,
-            )
+            logger.exception("get_completion Error")
         return None
 
     @observe()
     def get_article_summarization(self, article):
         if len(article) < 100:
-            logger.info(msg="article too short")
+            logger.info("article too short")
             return None
         return self.get_completion(self.ARTICLE_SUMMARY_PROMPT, article)
 
@@ -116,5 +103,5 @@ class OpenAIClient:
     def count_tokens(self, text, model=MODEL):
         encoding = tiktoken.encoding_for_model(model)
         num_tokens = len(encoding.encode(text))
-        logger.debug(msg="count_tokens")
+        logger.debug("count_tokens", extra={"num_tokens": num_tokens})
         return num_tokens

@@ -1,15 +1,15 @@
-import logging
-
+from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from dassie_logger import logger
 
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(event, context, theme_repo=None, useGlobal=False):
-    logger.info("Event: {} Context: {}".format(event, context))
+    logger.debug("del_related")
     response = {"statusCode": 204, "headers": {"Access-Control-Allow-Origin": "*"}}
     global init_context
     if init_context is None or not useGlobal:
@@ -25,7 +25,7 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=False):
             return response
         theme_repo.del_related(theme=theme, article_id=article_id)
     except Exception as error:
-        logger.error("Error: {}".format(error), exc_info=True)
+        logger.exception("Error")
         response["statusCode"] = 500
         response["body"] = {"message": str(error)}
     return response

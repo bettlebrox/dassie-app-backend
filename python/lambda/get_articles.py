@@ -1,8 +1,6 @@
-import logging
 from lambda_init_context import LambdaInitContext
-
-logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+from dassie_logger import logger
+from aws_lambda_powertools.logging import correlation_paths
 
 VALID_SORT_ORDERS = ["asc", "desc"]
 VALID_SORT_FIELDS = [
@@ -16,9 +14,13 @@ VALID_SORT_FIELDS = [
 init_context = None
 
 
+@logger.inject_lambda_context(
+    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
+)
 def lambda_handler(
     event, context, article_repo=None, openai_client=None, useGlobal=True
 ):
+    logger.debug("get_articles")
     global init_context
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(
@@ -52,7 +54,6 @@ def lambda_handler(
         if sort_field not in VALID_SORT_FIELDS:
             raise ValueError("Invalid sort field")
         article_id = event["path"].split("/")[-1]
-        logger.debug("Event: {} Context: {}".format(event, context))
         result = []
         response["body"] = None
         if article_id != "articles":
@@ -65,7 +66,7 @@ def lambda_handler(
             return response
         if filter is not None and filter != "":
             filter_embedding = openai_client.get_embedding(filter)
-        logger.info("filter: {}".format(filter))
+            logger.debug("filter by embedding", extra={"filter": filter})
         result = article_repo.get(
             limit=max,
             sort_by=sort_field,
@@ -76,11 +77,11 @@ def lambda_handler(
             ",".join([article.json() for article in result])
         )
     except ValueError as error:
-        logger.error("ValueError: {}".format(error), exc_info=True)
+        logger.exception("ValueError")
         response["body"] = {"message": str(error)}
         response["statusCode"] = 400
     except Exception as error:
-        logger.error("Error: {}".format(error), exc_info=True)
+        logger.exception("Error")
         response["body"] = {"message": str(error)}
         response["statusCode"] = 500
     return response
