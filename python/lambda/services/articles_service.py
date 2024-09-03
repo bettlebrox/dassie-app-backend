@@ -29,7 +29,7 @@ class ArticlesService:
                 ),
             )
         )
-        if article.summary == "" or article.created_at < datetime.now() - timedelta(
+        if article.summary is None or article.created_at < datetime.now() - timedelta(
             days=self.STALE_ARTICLE_THRESHOLD
         ):
             article = self._build_article_from_navlog(article, navlog)
@@ -47,14 +47,25 @@ class ArticlesService:
     ):
         if article_summary is None:
             return
-        logger.debug("Adding article summary", extra={"summary": article_summary})
         if "summary" in article_summary and article_summary["summary"] is not None:
+            logger.info(
+                "Adding article summary",
+                extra={
+                    "summary": article_summary,
+                    "token_count": token_count,
+                    "embedding_length": len(embedding),
+                },
+            )
             current_article.summary = article_summary["summary"]
             current_article.embedding = embedding
             current_article.token_count = token_count
             current_article.updated_at = datetime.now()
             self._article_repo.update(current_article)
         if "themes" in article_summary and article_summary["themes"] is not None:
+            logger.info(
+                "Adding article themes",
+                extra={"themes": article_summary["themes"]},
+            )
             self._theme_repo.add_related(current_article, article_summary["themes"])
 
     def get_search_terms_from_article(self, article):

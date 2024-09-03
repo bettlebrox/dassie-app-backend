@@ -9,8 +9,11 @@ import json
 import os
 from services.themes_service import ThemesService
 from aws_lambda_powertools import Logger
+import logging
 
 logger = Logger(service="themify", log_record_order=["message"])
+logger.addHandler(logging.FileHandler("/tmp/themify.log"))
+logger.setLevel(logging.INFO)
 
 CONTEXT_WINDOW_SIZE = 16000
 

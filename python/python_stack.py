@@ -51,7 +51,7 @@ class PythonStack(Stack):
             security_group_id="sg-0669c97cc65247ecd",
         )
         self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
-        self.ddb, self.archive_navlog = self.create_ddb_table()
+        self.ddb = self.create_ddb_table()
         self.openai_secret, self.langfuse_secret = self.create_secrets()
         (
             self.bucket,
@@ -59,6 +59,9 @@ class PythonStack(Stack):
             self.lambdas_env,
         ) = self.create_common_lambda_dependencies(
             self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
+        )
+        self.archive_bucket, self.archive_navlog = (
+            self.create_archive_related_resources(self.reqs_layers[2], self.ddb)
         )
         lambda_function_props = {
             "runtime": lambda_.Runtime.PYTHON_3_9,
@@ -215,7 +218,9 @@ class PythonStack(Stack):
             ),
             index_name="type-index",
         )
+        return ddb
 
+    def create_archive_related_resources(self, deps_layer, ddb):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -245,6 +250,7 @@ class PythonStack(Stack):
             environment={
                 "BUCKET_NAME": archive_bucket.bucket_name,
             },
+            layers=[deps_layer],
             timeout=Duration.minutes(1),
         )
 
@@ -263,7 +269,7 @@ class PythonStack(Stack):
             max_batching_window=Duration.minutes(5),
         )
 
-        return ddb, archive_function
+        return archive_bucket, archive_function
 
     def create_secrets(self):
         openai_secret = secretsmanager.Secret.from_secret_complete_arn(

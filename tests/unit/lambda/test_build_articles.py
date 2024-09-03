@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock
 from datetime import datetime, timedelta
 
@@ -108,7 +109,9 @@ def test_build_articles_error_handling(article_service, navlog_service, mock_con
         useGlobal=False,
     )
 
-    assert response["statusCode"] == 400
+    assert response["statusCode"] == 200
     assert "body" in response
     assert "message" in response["body"]
-    assert str(response["body"]["message"]) == "Test error"
+    body = json.loads(response["body"])
+    assert str(body["message"]) == "Articles processed successfully"
+    assert str(body["errors"]) == "1"

@@ -11,8 +11,11 @@ import boto3
 import json
 import os
 from aws_lambda_powertools import Logger
+import logging
 
 logger = Logger(service="sumit", log_record_order=["message"])
+logger.addHandler(logging.FileHandler("/tmp/sumit.log"))
+logger.setLevel(logging.INFO)
 
 
 def main():
@@ -53,19 +56,37 @@ def main():
     article_service = ArticlesService(
         article_repo, theme_repo, browse_repo, browsed_repo, openai_client
     )
-    for navlog in tqdm(navlogs, total=len(navlogs)):
+    # for navlog in tqdm(navlogs, total=len(navlogs)):
+    #     try:
+    #         if (
+    #             len(navlog["body_text"]) < 100
+    #             or "url" not in navlog
+    #             or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
+    #             < datetime.now() - timedelta(days=7)
+    #         ):
+    #             continue
+    #         article_service.process_navlog(navlog)
+    #     except Exception as error:
+    #         logger.exception(
+    #             f"Error processing navlog", extra={"navlog": navlog, "error": error}
+    #         )
+    articles = article_repo.get(days=30, limit=400)
+    logger.info(f"Found {len(articles)} articles")
+    for article in articles:
+        if article.summary is not None:
+            logger.info(f"Skipping {article.title}")
+            continue
+        logger.info(f"Article: {article.title}")
         try:
-            if (
-                len(navlog["body_text"]) < 100
-                or "url" not in navlog
-                or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
-                < datetime.now() - timedelta(days=7)
-            ):
-                continue
-            article_service.process_navlog(navlog)
+            article_service._add_llm_summarisation(
+                article,
+                openai_client.get_article_summarization(article.text),
+                openai_client.get_embedding(article.text),
+                openai_client.count_tokens(article.text),
+            )
         except Exception as error:
             logger.exception(
-                f"Error processing navlog", extra={"navlog": navlog, "error": error}
+                f"Error processing article", extra={"article": article, "error": error}
             )
 
 

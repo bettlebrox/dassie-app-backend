@@ -67,6 +67,7 @@ class Theme(Base):
             sum(
                 1 - self.cosine_similarity(self._embedding, article.embedding)
                 for article in self._related
+                if article._embedding is not None
             )
             / len(self._related)
         )

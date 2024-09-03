@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from sqlalchemy.orm.strategy_options import defer, joinedload
 from sqlalchemy import func
 from contextlib import closing
@@ -65,15 +66,21 @@ class ArticleRepository(BasePostgresRepository):
         descending=True,
         filter_embedding=None,
         threshold: float = 0.8,
+        days: int = None,
     ):
         with closing(self._session()) as session:
-            query = session.query(self.model).options(defer(Article._embedding))
+            query = session.query(self.model)
             query = (
                 query.where(
                     (1 - Article._embedding.cosine_distance(filter_embedding))
                     > threshold
                 )
                 if filter_embedding is not None
+                else query
+            )
+            query = (
+                query.where(Article._created_at > datetime.now() - timedelta(days=days))
+                if days is not None
                 else query
             )
             query = self._append_sort_by(query, sort_by, descending, filter_embedding)

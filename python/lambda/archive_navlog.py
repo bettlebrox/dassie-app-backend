@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from aws_lambda_powertools.logging import correlation_paths
 import boto3
 import os
 from botocore.exceptions import ClientError
