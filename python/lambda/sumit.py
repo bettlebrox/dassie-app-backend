@@ -13,9 +13,12 @@ import os
 from aws_lambda_powertools import Logger
 import logging
 
-logger = Logger(service="sumit", log_record_order=["message"])
-logger.addHandler(logging.FileHandler("/tmp/sumit.log"))
-logger.setLevel(logging.INFO)
+logger = Logger(
+    service="sumit",
+    log_record_order=["message"],
+    level=logging.INFO,
+    logger_handler=logging.FileHandler("/tmp/sumit.log"),
+)
 
 
 def main():
