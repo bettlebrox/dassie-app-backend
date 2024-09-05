@@ -18,6 +18,7 @@ class LLMResponseException(Exception):
 class OpenAIClient:
     MODEL = "gpt-3.5-turbo"
     CONTEXT_WINDOW_SIZE = 15000
+    MIN_TEXT_LENGTH = 1000
     THEME_SUMMARY_PROMPT = """
         Your task is to summarize the common theme, that appears in at least 2 texts, and any disagreements, between at least two texts, from the following webpages texts separated by three dashes.
         Output strictly only valid JSON object. Including the following:
@@ -61,8 +62,10 @@ class OpenAIClient:
             return None
 
     @observe()
-    def get_completion(self, prompt, query, model=MODEL):
-        if len(query) < 100:
+    def get_completion(
+        self, prompt, query, model=MODEL, min_text_length=MIN_TEXT_LENGTH
+    ):
+        if len(query) < min_text_length:
             logger.info("query too short")
             return None
         messages = [
@@ -76,6 +79,7 @@ class OpenAIClient:
                     model=model,
                     messages=messages,
                     temperature=self.TEMPERATURE,
+                    response_format={"type": "json_object"},
                 )
                 logger.debug("get_completion response")
             except Exception as error:
@@ -90,15 +94,17 @@ class OpenAIClient:
         return None
 
     @observe()
-    def get_article_summarization(self, article):
-        if len(article) < 100:
+    def get_article_summarization(self, article, model=MODEL):
+        if len(article) < self.MIN_TEXT_LENGTH:
             logger.info("article too short")
             return None
-        return self.get_completion(self.ARTICLE_SUMMARY_PROMPT, article)
+        return self.get_completion(self.ARTICLE_SUMMARY_PROMPT, article, model=model)
 
     @observe()
-    def get_theme_summarization(self, texts):
-        return self.get_completion(self.THEME_SUMMARY_PROMPT, "\n---\n".join(texts))
+    def get_theme_summarization(self, texts, model=MODEL):
+        return self.get_completion(
+            self.THEME_SUMMARY_PROMPT, "\n---\n".join(texts), model=model
+        )
 
     def count_tokens(self, text, model=MODEL):
         encoding = tiktoken.encoding_for_model(model)
