@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from dassie_logger import logger
 
-from models.models import Browse, Browsed
+from models.browse import Browse
+from models.models import Browsed
 from models.article import Article
 
 

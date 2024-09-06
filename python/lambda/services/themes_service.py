@@ -1,7 +1,8 @@
 from urllib.parse import quote_plus
 from dassie_logger import logger
 from models.theme import Theme, ThemeType
-from services.openai_client import LLMResponseException
+from services.openai_client import LLMResponseException, OpenAIClient
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 CONTEXT_WINDOW_SIZE = 15000
 
@@ -107,7 +108,7 @@ class ThemesService:
                 related_theme = self.theme_repo.upsert(related_theme)
                 existing_related_themes.append(related_theme)
             return existing_related_themes
-        except Exception as error:
+        except Exception:
             logger.exception("build_related_themes Error")
             return []
 
@@ -124,69 +125,40 @@ class ThemesService:
         )
         theme = None
         try:
-            if total_tokens <= CONTEXT_WINDOW_SIZE:
+            if total_tokens > CONTEXT_WINDOW_SIZE:
+                logger.debug(
+                    "Recursively splitting articles to fit context window size",
+                    extra={
+                        "total_tokens": total_tokens,
+                        "context_window_size": CONTEXT_WINDOW_SIZE,
+                    },
+                )
+                text_splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
+                    encoding_name=OpenAIClient.ENCODING.name,
+                    chunk_size=CONTEXT_WINDOW_SIZE,
+                    chunk_overlap=0,
+                )
+                texts = text_splitter.create_documents(
+                    ["\n---\n".join([a.text for a in articles])]
+                )
+                logger.debug(
+                    "Recursively split articles", extra={"num_texts": len(texts)}
+                )
+                summary = self.openai_client.get_theme_summarization(
+                    texts[0].page_content
+                )
+            elif total_tokens <= CONTEXT_WINDOW_SIZE:
                 summary = self.openai_client.get_theme_summarization(
                     [a.text for a in articles]
                 )
-                if summary is not None:
-                    theme = self.upsert_theme_from_summary(
-                        summary,
-                        theme_type,
-                        original_title,
-                        given_embedding,
-                        articles,
-                    )
-                return theme
-            logger.info("Arbitrarily cutting articles to fit context window size")
-            window = []
-            window_size = 0
-            article_window_size = CONTEXT_WINDOW_SIZE // min(len(articles), 8)
-            for i, art in enumerate(articles):
-                art_text = art.text
-                article_size = art.token_count
-                if CONTEXT_WINDOW_SIZE - window_size < article_window_size:
-                    article_window_size = CONTEXT_WINDOW_SIZE - window_size
-                while article_size > article_window_size:
-                    art_text = art_text[: len(art_text) // 2]
-                    article_size = self.openai_client.count_tokens(art_text)
-                    logger.debug(
-                        "Reducing article size",
-                        extra={
-                            "article_size": article_size,
-                            "article_window_size": article_window_size,
-                        },
-                    )
-                window.append(art_text)
-                window_size = window_size + article_size
-                if (
-                    window_size >= CONTEXT_WINDOW_SIZE - CONTEXT_WINDOW_SIZE // 8
-                    or len(articles) == i + 1
-                ):
-                    logger.debug(
-                        "Posting",
-                        extra={
-                            "articles_processed": i,
-                            "window_size": window_size,
-                        },
-                    )
-                    summary = self.openai_client.get_theme_summarization(window)
-                    if summary is not None:
-                        theme = self.upsert_theme_from_summary(
-                            summary,
-                            theme_type,
-                            original_title,
-                            given_embedding,
-                            articles,
-                        )
-                    return theme
-                else:
-                    logger.debug(
-                        "Window not full",
-                        extra={
-                            "articles_processed": i,
-                            "window_size": window_size,
-                        },
-                    )
+            if summary is not None:
+                theme = self.upsert_theme_from_summary(
+                    summary,
+                    theme_type,
+                    original_title,
+                    given_embedding,
+                    articles,
+                )
             return theme
         except LLMResponseException as error:
             raise error

@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock
-from models.models import Browse
+from models.browse import Browse
 from services.articles_service import ArticlesService
 from models.article import Article
 from models.theme import Theme

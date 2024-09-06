@@ -2,7 +2,8 @@ from contextlib import closing
 from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from models.models import Browse, Browsed
+from models.models import Browsed
+from models.browse import Browse
 from repos import BasePostgresRepository
 
 

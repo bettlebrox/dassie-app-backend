@@ -17,6 +17,7 @@ class LLMResponseException(Exception):
 
 class OpenAIClient:
     MODEL = "gpt-3.5-turbo"
+    ENCODING = tiktoken.encoding_for_model(MODEL)
     CONTEXT_WINDOW_SIZE = 15000
     MIN_TEXT_LENGTH = 1000
     THEME_SUMMARY_PROMPT = """
@@ -102,12 +103,16 @@ class OpenAIClient:
 
     @observe()
     def get_theme_summarization(self, texts, model=MODEL):
+        if not isinstance(texts, list):
+            return self.get_completion(self.THEME_SUMMARY_PROMPT, texts, model=model)
         return self.get_completion(
             self.THEME_SUMMARY_PROMPT, "\n---\n".join(texts), model=model
         )
 
     def count_tokens(self, text, model=MODEL):
-        encoding = tiktoken.encoding_for_model(model)
+        encoding = (
+            self.ENCODING if model == self.MODEL else tiktoken.encoding_for_model(model)
+        )
         num_tokens = len(encoding.encode(text))
         logger.debug("count_tokens", extra={"num_tokens": num_tokens})
         return num_tokens

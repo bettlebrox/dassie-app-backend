@@ -32,11 +32,10 @@ class Theme(Base):
     _title = Column(String)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
-    _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _embedding = Column(Vector(1536))
     _avg_article_distance = Column(Float, default=0.0)
     _related = relationship(
-        "Article", secondary="association", order_by=Article._created_at
+        "Article", secondary="association", order_by=Article._updated_at.desc()
     )
     _recurrent = relationship(
         "Theme",

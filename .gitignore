@@ -28,3 +28,4 @@ pytestdebug.log
 backup.sql
 .backup.sql.swp
 node_modules
+local.env

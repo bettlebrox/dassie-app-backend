@@ -4,8 +4,6 @@ from datetime import datetime
 from sqlalchemy.orm import sessionmaker, joinedload
 from sqlalchemy import create_engine, func
 from sqlalchemy.exc import IntegrityError
-import sys
-import os
 
 
 @pytest.fixture(scope="module")
@@ -20,10 +18,11 @@ from models.models import (
     Sporadic,
     Base,
     Browsed,
-    Browse,
 )
+
 from models.article import Article
 from models.theme import Theme
+from models.browse import Browse
 
 
 @pytest.fixture

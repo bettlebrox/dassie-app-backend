@@ -1,10 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta
-from sqlalchemy import func
-from models.models import Browse, Browsed
-from models.article import Article
-from models.theme import Theme
+from datetime import datetime
+from models.browse import Browse
 from browse_repo import BrowseRepository
 
 

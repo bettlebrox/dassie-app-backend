@@ -14,7 +14,6 @@ class Article(Base):
     _title = Column(String)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
-    _updated_at = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _logged_at = Column(DateTime, index=True)
     _url = Column(String(2000))
     _token_count = Column(Integer)

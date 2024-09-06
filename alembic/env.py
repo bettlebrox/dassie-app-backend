@@ -2,6 +2,7 @@ from logging.config import fileConfig
 from models.models import Base
 from models.article import Article
 from models.theme import Theme, ThemeType
+from models.browse import Browse
 from sqlalchemy import create_engine
 from sqlalchemy import pool
 import boto3
