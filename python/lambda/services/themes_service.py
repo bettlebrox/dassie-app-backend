@@ -43,7 +43,9 @@ class ThemesService:
             else theme
         )
         theme.summary = summary["summary"]
-        theme.source = theme_type
+        if theme.source is None:
+            theme.source = theme_type
+            logger.debug("Set theme source", extra={"theme": theme.title})
         if given_embedding is None and theme.embedding is None:
             theme.embedding = self.openai_client.get_embedding(theme.original_title)
         elif given_embedding is not None:

@@ -47,7 +47,7 @@ class ThemeRepository(BasePostgresRepository):
                 )
             )
             query = (
-                query.filter(self.model._sources.in_(source))
+                query.filter(self.model._source.in_(source))
                 if source is not None
                 else query
             )
@@ -72,7 +72,7 @@ class ThemeRepository(BasePostgresRepository):
         limit: int = 10,
         source: List[ThemeType] = None,
         days: int = 0,
-        min_articles: int = 3,
+        min_articles: int = 2,
     ):
         logger.debug(
             "get_top",

@@ -36,7 +36,7 @@ def lambda_handler(
                     len(navlog["body_text"]) < 100
                     or "url" not in navlog
                     or datetime.strptime(navlog["created_at"], "%Y-%m-%dT%H:%M:%S.%f")
-                    < datetime.now() - timedelta(days=7)
+                    < datetime.now() - timedelta(days=2)
                 ):
                     skipped += 1
                     continue

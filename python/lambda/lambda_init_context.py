@@ -27,6 +27,7 @@ class LambdaInitContext:
         theme_service=None,
         article_service=None,
         navlog_service=None,
+        browse_repo=None,
     ):
         logger.info("init lambda context")
         self._secrets_manager = secrets_manager
@@ -36,7 +37,7 @@ class LambdaInitContext:
         self._theme_repo = theme_repo
         self._theme_service = theme_service
         self._article_service = article_service
-        self._browse_repo = None
+        self._browse_repo = browse_repo
         self._browsed_repo = None
         self._navlog_service = navlog_service
 

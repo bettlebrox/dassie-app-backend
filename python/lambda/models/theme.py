@@ -79,6 +79,10 @@ class Theme(Base):
         )
 
     @property
+    def most_recent_related_article(self):
+        return self._related[0] if self._related else None
+
+    @property
     def id(self):
         return self._id
 

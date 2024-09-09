@@ -75,7 +75,7 @@ def main():
             )
     recent_browses = browse_repo.get_recently_browsed(days=3, limit=2000)
     for browse in recent_browses:
-        if len(browse.articles) > 5 and browse.title is None:
+        if len(browse.articles) > 3 and browse.title is None:
             themes_service.build_theme_from_related_articles(
                 browse.articles, ThemeType.TAB_THREAD
             )

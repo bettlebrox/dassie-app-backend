@@ -21,9 +21,9 @@ class BrowseRepository(BasePostgresRepository):
                 .first()
             )
 
-    def get_recently_browsed(self, limit: int = 10, days=7):
+    def get_recently_browsed(self, limit: int = 10, days=7, hours=0):
         with closing(self._session()) as session:
-            cut_off_date = datetime.now() - timedelta(days=days)
+            cut_off_date = datetime.now() - timedelta(days=days, hours=hours)
             subquery = (
                 session.query(
                     Browsed._browse_id,

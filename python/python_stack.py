@@ -86,6 +86,13 @@ class PythonStack(Stack):
                 self.langfuse_secret,
                 lambda_function_props,
             ),
+            "build_themes": self.create_lambda_function(
+                "build_themes",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
             "get_themes": self.create_lambda_function(
                 "get_themes",
                 self.sql_db,
@@ -133,8 +140,12 @@ class PythonStack(Stack):
             list(self.functions.values()), self.sql_db
         )
 
-        self.create_scheduled_event_for_build_articles(self.functions["build_articles"])
-
+        self.create_scheduled_event_for_function(
+            "build_articles", self.functions["build_articles"], "27"
+        )
+        self.create_scheduled_event_for_function(
+            "build_themes", self.functions["build_themes"], "47"
+        )
         self.apiGateway = self.create_api_gateway_resources(self.functions)
 
         CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
@@ -484,15 +495,15 @@ class PythonStack(Stack):
         )
         return apiGateway
 
-    def create_scheduled_event_for_build_articles(self, build_articles_function):
+    def create_scheduled_event_for_function(self, name, function, minute):
         # Create a rule that runs every day at 2:00 AM UTC
         rule = events.Rule(
             self,
-            "BuildArticlesScheduleRule",
+            name + "ScheduleRule",
             schedule=events.Schedule.cron(
-                minute="27", hour="8-21", month="*", week_day="*", year="*"
+                minute=minute, hour="8-21", month="*", week_day="*", year="*"
             ),
         )
 
         # Add the Lambda function as a target for this rule
-        rule.add_target(targets.LambdaFunction(build_articles_function))
+        rule.add_target(targets.LambdaFunction(function))
