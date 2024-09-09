@@ -50,23 +50,20 @@ def main():
         os.environ["OPENAI_API_KEY"], os.environ["LANGFUSE_KEY"]
     )
     themes_service = ThemesService(theme_repo, article_repo, openai_client)
-    top_themes = theme_repo.get_top(100)
+    top_themes = theme_repo.get_top(
+        100,
+        source=[
+            ThemeType.TOP,
+            ThemeType.ARTICLE,
+            ThemeType.RECURRENT,
+            ThemeType.SPORADIC,
+        ],
+        days=1,
+    )
     for theme in top_themes:
         try:
-            if (
-                theme.source == ThemeType.TOP
-                and theme.updated_at > datetime.now() - timedelta(days=30)
-            ):
-                logger.info(
-                    "Skipping theme",
-                    extra={
-                        "theme_title": theme.original_title,
-                        "reason": "updated_recently",
-                    },
-                )
-                continue
             themes_service.build_theme_from_related_articles(
-                theme.related, ThemeType.TOP, theme.original_title
+                theme.related, theme.source, theme.original_title
             )
         except LLMResponseException as e:
             logger.exception(
@@ -76,7 +73,7 @@ def main():
                     "error": str(e),
                 },
             )
-    recent_browses = browse_repo.get_recently_browsed(days=2, limit=2000)
+    recent_browses = browse_repo.get_recently_browsed(days=3, limit=2000)
     for browse in recent_browses:
         if len(browse.articles) > 5 and browse.title is None:
             themes_service.build_theme_from_related_articles(

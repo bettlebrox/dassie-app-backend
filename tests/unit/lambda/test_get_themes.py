@@ -104,5 +104,20 @@ def test_get_themes_with_params(theme_repo, mock_context):
         theme_repo,
         useGlobal=False,
     )
-    theme_repo.get_recent.assert_called_with(2, ThemeType.CUSTOM)
+    theme_repo.get_recent.assert_called_with(2, [ThemeType.CUSTOM])
+    assert response["statusCode"] == 200
+    response = lambda_handler(
+        {
+            "path": "/themes",
+            "queryStringParameters": {
+                "sortField": "updated_at",
+                "source": "custom,top",
+                "max": 2,
+            },
+        },
+        mock_context,
+        theme_repo,
+        useGlobal=False,
+    )
+    theme_repo.get_recent.assert_called_with(2, [ThemeType.CUSTOM, ThemeType.TOP])
     assert response["statusCode"] == 200

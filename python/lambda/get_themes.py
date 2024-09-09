@@ -25,7 +25,11 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
             else {"max": max, "sortField": sort_field}
         )
         sort_field = params["sortField"] if "sortField" in params else sort_field
-        source = ThemeType(params["source"]) if "source" in params else ThemeType.TOP
+        source = (
+            [ThemeType(source) for source in params["source"].split(",")]
+            if "source" in params
+            else [ThemeType.TOP]
+        )
         result = []
         max = int(params["max"]) if "max" in params else "max"
         title = event["path"].split("/")[-1]

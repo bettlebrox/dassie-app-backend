@@ -1,11 +1,13 @@
 from typing import Any
 from unittest.mock import MagicMock
+from sqlalchemy import func
 
 import pytest
 from theme_repo import ThemeRepository
 from models.models import Association
 from models.article import Article
-from models.theme import Theme
+from models.theme import Theme, ThemeType
+from models.browse import Browse
 from sqlalchemy.orm.exc import NoResultFound
 
 
@@ -19,6 +21,20 @@ def repo():
 @pytest.fixture
 def mock_query(repo: ThemeRepository) -> Any:
     return repo._session.return_value.query.return_value
+
+
+@pytest.fixture
+def get_top_mock_query(mock_query: Any) -> Any:
+    return (
+        mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
+    )
+
+
+@pytest.fixture
+def get_top_mock_query_with_source(mock_query: Any) -> Any:
+    return (
+        mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
+    )
 
 
 def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
@@ -172,3 +188,156 @@ def test_upsert_with_none_id(repo: ThemeRepository, mock_query: Any):
     assert result.original_title == "Theme Without Id"
     repo._session.return_value.merge.assert_called_once_with(theme_without_id)
     repo._session.return_value.commit.assert_called_once()
+
+
+def test_get_top_themes(
+    repo: ThemeRepository, get_top_mock_query: Any, mock_query: Any
+):
+    # Mock the query result
+    mock_query.join.return_value.group_by.return_value.order_by.return_value.statement.compile.return_value = (
+        "SELECT * FROM themes"
+    )
+    get_top_mock_query.return_value = [
+        Theme(original_title="Popular Theme 1"),
+        Theme(original_title="Popular Theme 2"),
+        Theme(original_title="Popular Theme 3"),
+    ]
+
+    # Call the get_top method
+    top_themes = repo.get_top(3)
+
+    # Assert the results
+    assert len(top_themes) == 3
+    assert top_themes[0].original_title == "Popular Theme 1"
+    assert top_themes[1].original_title == "Popular Theme 2"
+    assert top_themes[2].original_title == "Popular Theme 3"
+
+    # Verify the query construction
+    mock_query.join.assert_called_once_with(Association)
+    mock_query.join.return_value.group_by.assert_called_once_with(Theme._id)
+    assert (
+        func.count(Association.article_id)
+        .desc()
+        .compare(
+            mock_query.join.return_value.group_by.return_value.having.return_value.order_by.call_args[
+                0
+            ][
+                0
+            ]
+        )
+    )
+    mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
+        3
+    )
+
+
+def test_get_top_themes_with_custom_limit(
+    repo: ThemeRepository, mock_query: Any, get_top_mock_query: Any
+):
+    # Mock the query result
+    get_top_mock_query.return_value = [
+        Theme(original_title="Popular Theme 1"),
+        Theme(original_title="Popular Theme 2"),
+    ]
+
+    # Call the get_top method with a custom limit
+    top_themes = repo.get_top(2)
+
+    # Assert the results
+    assert len(top_themes) == 2
+    assert top_themes[0].original_title == "Popular Theme 1"
+    assert top_themes[1].original_title == "Popular Theme 2"
+
+    # Verify the query construction with custom limit
+    mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
+        2
+    )
+
+
+def test_get_top_themes_empty_result(repo: ThemeRepository, get_top_mock_query: Any):
+    # Mock an empty query result
+    get_top_mock_query.return_value = []
+
+    # Call the get_top method
+    top_themes = repo.get_top(5)
+
+    # Assert the results
+    assert len(top_themes) == 0
+
+
+def test_get_top_themes_with_source_type(
+    repo: ThemeRepository, mock_query: Any, get_top_mock_query_with_source: Any
+):
+    # Mock the query result
+    get_top_mock_query_with_source.return_value = [
+        Theme(original_title="Popular Theme 1"),
+        Theme(original_title="Popular Theme 2"),
+    ]
+
+    # Call the get_top method with a source type
+    top_themes = repo.get_top(2, source=[ThemeType.ARTICLE])
+
+    # Assert the results
+    assert len(top_themes) == 2
+    assert top_themes[0].original_title == "Popular Theme 1"
+    assert top_themes[1].original_title == "Popular Theme 2"
+
+    # Verify the query construction with source type filter
+    mock_query.join.assert_called_once_with(Association)
+    assert (Theme._source.in_([ThemeType.ARTICLE])).compare(
+        mock_query.join.return_value.filter.call_args[0][0]
+    )
+    mock_query.join.return_value.filter.return_value.group_by.assert_called_once_with(
+        Theme._id
+    )
+    assert (
+        func.count(Association.article_id)
+        .desc()
+        .compare(
+            mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.call_args[
+                0
+            ][
+                0
+            ]
+        )
+    )
+    mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
+        2
+    )
+
+
+def test_get_top_themes_without_source_type(
+    repo: ThemeRepository, mock_query: Any, get_top_mock_query: Any
+):
+    # Mock the query result
+    get_top_mock_query.return_value = [
+        Theme(original_title="Popular Theme 1"),
+        Theme(original_title="Popular Theme 2"),
+    ]
+
+    # Call the get_top method without a source type
+    top_themes = repo.get_top(2)
+
+    # Assert the results
+    assert len(top_themes) == 2
+    assert top_themes[0].original_title == "Popular Theme 1"
+    assert top_themes[1].original_title == "Popular Theme 2"
+
+    # Verify the query construction without source type filter
+    mock_query.join.assert_called_once_with(Association)
+    mock_query.join.return_value.filter.assert_not_called()
+    mock_query.join.return_value.group_by.assert_called_once_with(Theme._id)
+    assert (
+        func.count(Association.article_id)
+        .desc()
+        .compare(
+            mock_query.join.return_value.group_by.return_value.having.return_value.order_by.call_args[
+                0
+            ][
+                0
+            ]
+        )
+    )
+    mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
+        2
+    )

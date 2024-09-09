@@ -24,7 +24,7 @@ class ThemeRepository(BasePostgresRepository):
         return super().get_all()
 
     def get_recently_browsed(
-        self, limit: int = 10, source: ThemeType = ThemeType.TOP, days=7
+        self, limit: int = 10, source: List[ThemeType] = None, days=7
     ):
         with closing(self._session()) as session:
             browsed_articles = (
@@ -37,7 +37,7 @@ class ThemeRepository(BasePostgresRepository):
             logger.info(
                 "found browsed_articles", extra={"count": len(browsed_articles)}
             )
-            return (
+            query = (
                 session.query(self.model)
                 .join(Association)
                 .filter(
@@ -45,22 +45,35 @@ class ThemeRepository(BasePostgresRepository):
                         [article.id for article in browsed_articles]
                     )
                 )
-                .group_by(self.model._id)
+            )
+            query = (
+                query.filter(self.model._sources.in_(source))
+                if source is not None
+                else query
+            )
+            return (
+                query.group_by(self.model._id)
                 .order_by(self.model._updated_at.desc())
                 .limit(limit)
             )
 
-    def get_recent(self, limit: int = 10, source: ThemeType = ThemeType.TOP):
+    def get_recent(self, limit: int = 10, source: List[ThemeType] = None):
         with closing(self._session()) as session:
             query = session.query(self.model)
             query = (
-                query.filter(self.model._source == source)
+                query.filter(self.model._sources.in_(source))
                 if source is not None
                 else query
             )
             return query.order_by(self.model._updated_at.desc()).limit(limit)
 
-    def get_top(self, limit: int = 10, source: ThemeType = None, days: int = 0):
+    def get_top(
+        self,
+        limit: int = 10,
+        source: List[ThemeType] = None,
+        days: int = 0,
+        min_articles: int = 3,
+    ):
         logger.debug(
             "get_top",
             extra={
@@ -76,7 +89,7 @@ class ThemeRepository(BasePostgresRepository):
             join_query = (
                 join_query
                 if source is None
-                else join_query.filter(self.model._source == source)
+                else join_query.filter(self.model._source.in_(source))
             )
             join_query = (
                 join_query
@@ -85,10 +98,11 @@ class ThemeRepository(BasePostgresRepository):
                     Association.created_at > datetime.now() - timedelta(days=days)
                 )
             )
-            query = join_query.group_by(self.model._id).order_by(
-                func.count(Association.article_id).desc()
+            query = (
+                join_query.group_by(self.model._id)
+                .having(func.count(Association.article_id) > min_articles)
+                .order_by(func.count(Association.article_id).desc())
             )
-            query = query.limit(limit).with_entities(self.model)
             logger.debug(
                 "get_topquery",
                 extra={
@@ -97,6 +111,8 @@ class ThemeRepository(BasePostgresRepository):
                     )
                 },
             )
+            query = query.limit(limit).with_entities(self.model)
+
             return query
 
     def add(self, model):
