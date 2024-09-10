@@ -15,7 +15,7 @@ class ThemesService:
 
     def build_related_from_title(self, theme):
         embedding = self.openai_client.get_embedding(theme.title)
-        theme.related = self.article_repo.get_by_theme_embedding(embedding)
+        theme.related = self.article_repo.get(filter_embedding=embedding)
         logger.info(
             "Found related articles",
             extra={
@@ -51,9 +51,11 @@ class ThemesService:
         elif given_embedding is not None:
             theme.embedding = given_embedding
         if related_articles is None and (
-            theme.related is None or len(theme.related) == 0
+            theme.related is None
+            or len(theme.related) == 0
+            or theme.most_recent_related_article != related_articles[0]
         ):
-            theme.related = self.article_repo.get_by_theme_embedding(theme.embedding)
+            theme.related = self.article_repo.get(filter_embedding=theme.embedding)
             logger.debug(
                 "Found related articles",
                 extra={

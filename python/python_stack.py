@@ -329,6 +329,8 @@ class PythonStack(Stack):
             "DD_SERVERLESS_LOGS_ENABLED": "true",
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
+            "DD_PROFILING_ENABLED": "true",
+            "DD_PROFILING_IGNORE_PROFILER": "true",
         }
         return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
 

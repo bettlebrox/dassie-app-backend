@@ -55,6 +55,7 @@ class Article(Base):
             "updated_at": (
                 "" if self._updated_at is None else self._updated_at.isoformat()
             ),
+            "text": self._text,
             "source": self._source_navlog,
             "image": self._image,
             "themes": [theme.json(dump=False) for theme in self._themes],

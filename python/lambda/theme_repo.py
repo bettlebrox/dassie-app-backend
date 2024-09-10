@@ -61,7 +61,7 @@ class ThemeRepository(BasePostgresRepository):
         with closing(self._session()) as session:
             query = session.query(self.model)
             query = (
-                query.filter(self.model._sources.in_(source))
+                query.filter(self.model._source.in_(source))
                 if source is not None
                 else query
             )
