@@ -330,6 +330,9 @@ class PythonStack(Stack):
             "DD_SERVERLESS_LOGS_ENABLED": "true",
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
+            "DD_ENV": "prod",
+            "DD_SERVICE": "dassie-app-backend",
+            "DD_VERSION": "1.0.0",
         }
         return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
 
