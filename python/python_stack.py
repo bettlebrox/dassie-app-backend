@@ -16,7 +16,7 @@ import aws_cdk.aws_iam as iam
 import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
-from python.python_dependencies_stack import PythonDependenciesStack
+from python_dependencies_stack import PythonDependenciesStack
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -84,14 +84,14 @@ class PythonStack(Stack):
                 self.sql_db,
                 self.openai_secret,
                 self.langfuse_secret,
-                lambda_function_props,
+                {**lambda_function_props, "timeout": Duration.seconds(120)},
             ),
             "build_themes": self.create_lambda_function(
                 "build_themes",
                 self.sql_db,
                 self.openai_secret,
                 self.langfuse_secret,
-                lambda_function_props,
+                {**lambda_function_props, "timeout": Duration.seconds(120)},
             ),
             "get_themes": self.create_lambda_function(
                 "get_themes",
@@ -173,6 +173,7 @@ class PythonStack(Stack):
             site="datadoghq.eu",
             python_layer_version=98,
             extension_layer_version=64,
+            enable_profiling=True,
         )
         datadog_ext.add_lambda_functions(functions)
         for f in functions:
@@ -329,8 +330,6 @@ class PythonStack(Stack):
             "DD_SERVERLESS_LOGS_ENABLED": "true",
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
-            "DD_PROFILING_ENABLED": "true",
-            "DD_PROFILING_IGNORE_PROFILER": "true",
         }
         return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
 
