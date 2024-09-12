@@ -6,10 +6,9 @@ from models.theme import ThemeType
 init_context = None
 
 
-@logger.inject_lambda_context(
-    correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
-)
+@logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
 def lambda_handler(event, context, theme_repo=None, useGlobal=True):
+    logger.debug("begin lambda_handler")
     global init_context
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(theme_repo=theme_repo)
@@ -61,4 +60,5 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
         logger.exception("Error")
         response["statusCode"] = 500
         response["body"] = {"message": str(error)}
+    logger.debug("end lambda_handler")
     return response

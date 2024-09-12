@@ -26,25 +26,30 @@ class ThemeRepository(BasePostgresRepository):
     def get_recently_browsed(
         self, limit: int = 10, source: List[ThemeType] = None, days=7
     ):
+        logger.debug(
+            "get_recently_browsed",
+            extra={
+                "limit": limit,
+                "source": source,
+                "days": days,
+            },
+        )
         with closing(self._session()) as session:
-            browsed_articles = (
-                session.query(Article)
+            browsed_articles_ids = [
+                row[0]
+                for row in session.query(Article._id)
                 .filter(Browsed._logged_at > datetime.now() - timedelta(days=days))
                 .join(Browsed)
                 .group_by(Article._id)
                 .all()
-            )
+            ]
             logger.info(
-                "found browsed_articles", extra={"count": len(browsed_articles)}
+                "found browsed_articles", extra={"count": len(browsed_articles_ids)}
             )
             query = (
                 session.query(self.model)
                 .join(Association)
-                .filter(
-                    Association.article_id.in_(
-                        [article.id for article in browsed_articles]
-                    )
-                )
+                .filter(Association.article_id.in_(browsed_articles_ids))
             )
             query = (
                 query.filter(self.model._source.in_(source))

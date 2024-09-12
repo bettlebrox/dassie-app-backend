@@ -47,8 +47,8 @@ def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
         mock_query.filter.return_value.join.return_value.group_by.return_value.all
     )
     article_query.return_value = [
-        art1,
-        art2,
+        (art1._id,),
+        (art2._id,),
     ]
     theme_query = (
         mock_query.join.return_value.filter.return_value.group_by.return_value.order_by.return_value.limit
