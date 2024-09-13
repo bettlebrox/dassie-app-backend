@@ -154,18 +154,28 @@ class PythonStack(Stack):
             "build_themes", self.functions["build_themes"], "47"
         )
 
-        # Create EventBridge rule to trigger process_theme when add_theme completes
-        events.Rule(
+        # Create the EventBus
+        self.event_bus = events.EventBus(
+            self,
+            "DassieAsyncEvents",
+            event_bus_name="dassie-async-events",
+        )
+
+        # Grant permission to add_theme function to put events to the EventBus
+        self.event_bus.grant_put_events_to(self.functions["add_theme"])
+
+        self.add_theme_completion_rule = events.Rule(
             self,
             "AddThemeCompletionRule",
+            event_bus=self.event_bus,
             event_pattern=events.EventPattern(
-                source=["aws.lambda"],
+                source=["dassie.lambda"],
                 detail_type=["Lambda Function Invocation Result"],
                 detail={
                     "requestContext": {
                         "functionName": [self.functions["add_theme"].function_name]
                     },
-                    "responsePayload": {"statusCode": ["202"]},
+                    "responsePayload": {"statusCode": [202]},
                 },
             ),
             targets=[

@@ -28,8 +28,12 @@ class ThemesService:
         theme = self.theme_repo.upsert(theme)
         return theme
 
-    def get_theme_by_title(self, title):
+    def get_theme_by_original_title(self, title):
         return self.theme_repo.get_by_title(quote_plus(title.lower()))
+
+    def get_theme_by_title(self, title):
+        logger.debug(f"Retrieving theme {title}")
+        return self.theme_repo.get_by_title(title)
 
     def upsert_theme_from_summary(
         self,

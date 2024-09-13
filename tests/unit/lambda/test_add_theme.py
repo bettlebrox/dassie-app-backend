@@ -52,6 +52,8 @@ def test_add_theme(aws_credentials, create_secret, mock_context):
     theme_service.get_theme_by_title.return_value = None
     test_theme = Theme("new theme", source=ThemeType.CUSTOM)
     theme_service.add_theme.return_value = test_theme
+    mock_context.function_name = "add_theme"
+    mock_context.function_version = "1"
     payload = lambda_handler(
         event, mock_context, theme_service=theme_service, useGlobal=False
     )

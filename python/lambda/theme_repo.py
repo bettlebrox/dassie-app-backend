@@ -138,7 +138,8 @@ class ThemeRepository(BasePostgresRepository):
 
     def get_by_title(self, title: str):
         with closing(self._session()) as session:
-            themes = (
+            logger.debug(f"Retrieving theme {title}")
+            theme = (
                 session.query(self.model)
                 .options(
                     joinedload(self.model._related).selectinload(Article._themes),
@@ -148,7 +149,8 @@ class ThemeRepository(BasePostgresRepository):
                 .filter(self.model._title == title)
                 .first()
             )
-            return themes[0] if themes is not None and type(themes) is list else themes
+            logger.debug(f"Retrieved theme {theme}")
+            return theme
 
     def get_by_original_titles(self, original_titles: List[str]):
         with closing(self._session()) as session:

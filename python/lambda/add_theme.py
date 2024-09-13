@@ -3,7 +3,7 @@ from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
 from models.theme import Theme, ThemeType
 from dassie_logger import logger
-
+import boto3
 
 init_context = None
 
@@ -35,7 +35,7 @@ def lambda_handler(
             response["body"] = json.dumps({"message": "Bad Request"})
             response["statusCode"] = 400
             return response
-        theme = theme_service.get_theme_by_title(title)
+        theme = theme_service.get_theme_by_original_title(title)
         if theme is not None:
             response["body"] = json.dumps({"message": "Theme already exists"})
             response["statusCode"] = 302
@@ -46,6 +46,24 @@ def lambda_handler(
             response["body"] = json.dumps({"message": "Theme not added"})
             return response
         response["body"] = theme.json()
+        client = boto3.client("events")
+        event_detail = {
+            "requestContext": {
+                "functionName": context.function_name,
+                "functionVersion": context.function_version,
+            },
+            "responsePayload": response,
+        }
+        client.put_events(
+            Entries=[
+                {
+                    "Source": "dassie.lambda",
+                    "DetailType": "Lambda Function Invocation Result",
+                    "Detail": json.dumps(event_detail),
+                    "EventBusName": "dassie-async-events",
+                }
+            ]
+        )
         return response
     except Exception as error:
         logger.exception("Error")

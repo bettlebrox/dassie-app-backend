@@ -34,7 +34,7 @@ def lambda_handler(
 
         payload = json.loads(event["body"])
         title = payload["title"]
-        logger.info("Processing theme", extra={"title": title})
+        logger.info(f"Retrieving theme {title}")
 
         theme = theme_service.get_theme_by_title(title)
         if theme is None:

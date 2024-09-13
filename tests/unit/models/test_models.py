@@ -219,7 +219,14 @@ def test_theme_without_summary(session):
     session.commit()
 
     retrieved_theme = (
-        session.query(Theme).filter_by(_title=quote_plus("no summary theme")).first()
+        session.query(Theme)
+        .options(
+            joinedload(Theme._related).selectinload(Article._themes),
+            joinedload(Theme._recurrent),
+            joinedload(Theme._sporadic),
+        )
+        .filter(Theme._title == "no+summary+theme")
+        .first()
     )
 
     assert retrieved_theme._title == quote_plus("no summary theme")

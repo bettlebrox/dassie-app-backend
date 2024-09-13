@@ -1,0 +1,7 @@
+{
+  "statusCode": 202,
+  "headers": {
+      "Access-Control-Allow-Origin": "*"
+  },
+  "body": "{\"id\": \"8902b6ee-193c-48de-846f-2c071be16585\", \"title\": \"ai+for+junior+developers\", \"original_title\": \"Ai For Junior Developers\", \"summary\": null, \"avg_cosine_distance_per_article\": 0.0, \"created_at\": \"2024-09-13T15:16:36.651012\", \"updated_at\": \"2024-09-13T15:16:43.362253\", \"source\": \"custom\"}"
+}
