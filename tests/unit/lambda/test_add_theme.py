@@ -48,50 +48,29 @@ def create_secret():
 @mock_aws
 def test_add_theme(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
-    theme_repo = MagicMock()
-    article_repo = MagicMock()
-    openai_client = MagicMock()
-    test_embedding = [1, 2, 3]
-    openai_client.get_embedding.return_value = test_embedding
-    openai_client.count_tokens.return_value = 150
-    article_repo.get.return_value = [Article("some article", "http://bob.com")]
-    test_theme = Theme("new theme", "some summary")
-    test_theme.source = ThemeType.CUSTOM
-    theme_repo.get_by_title.return_value = None
-    theme_repo.get_by_id.return_value = test_theme
-    themes_service = ThemesService(theme_repo, article_repo, openai_client)
+    theme_service = MagicMock()
+    theme_service.get_theme_by_title.return_value = None
+    test_theme = Theme("new theme", source=ThemeType.CUSTOM)
+    theme_service.add_theme.return_value = test_theme
     payload = lambda_handler(
-        event, mock_context, article_repo, openai_client, themes_service, False
+        event, mock_context, theme_service=theme_service, useGlobal=False
     )
-    article_repo.get.assert_called_with(filter_embedding=test_embedding)
-    assert payload["statusCode"] == 201, f"status code is not 201"
+    assert payload["statusCode"] == 202, f"status code is not 202"
     theme = json.loads(payload["body"])
-    assert theme["original_title"] == test_theme.original_title
-    assert theme["source"] == test_theme.source.value
+    assert theme["original_title"] == "New Theme"
+    assert theme["source"] == ThemeType.CUSTOM.value
 
 
 @mock_aws
 def test_add_theme_error(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
-    theme_repo = MagicMock()
-    article_repo = MagicMock()
-    openai_client = MagicMock()
-    test_embedding = [1, 2, 3]
-    openai_client.get_embedding.return_value = test_embedding
-    openai_client.count_tokens.return_value = 150
-    llm_exception = LLMResponseException("LLM response not formatted correctly")
-    openai_client.get_theme_summarization.side_effect = llm_exception
-    article_repo.get.return_value = [Article("some article", "http://bob.com")]
-    themes_service = ThemesService(theme_repo, article_repo, openai_client)
-    test_theme = Theme("new theme", "some summary")
+    theme_service = MagicMock()
+    theme_service.get_theme_by_title.side_effect = Exception("error")
     payload = lambda_handler(
         event,
         mock_context,
-        article_repo,
-        openai_client,
-        themes_service,
+        theme_service=theme_service,
         useGlobal=False,
     )
-    article_repo.get.assert_called_with(filter_embedding=test_embedding)
     assert payload["statusCode"] == 500
-    assert json.loads(payload["body"])["message"] == llm_exception.message
+    assert json.loads(payload["body"])["message"] == "error"

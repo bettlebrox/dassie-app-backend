@@ -227,6 +227,14 @@ class ThemeRepository(BasePostgresRepository):
     def upsert(self, model):
         try:
             if self.get_by_id(model.id) is not None:
+                logger.debug(
+                    "Updating existing theme",
+                    extra={"theme": model.title},
+                )
                 return self.update(model)
         except NoResultFound as e:
+            logger.debug(
+                "Adding new theme",
+                extra={"theme": model.title},
+            )
             return self.add(model)

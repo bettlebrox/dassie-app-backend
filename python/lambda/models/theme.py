@@ -55,9 +55,10 @@ class Theme(Base):
         secondaryjoin=Sporadic.related_id == _id,
     )
 
-    def __init__(self, original_title="", summary=None):
+    def __init__(self, original_title="", summary=None, source=ThemeType.ARTICLE):
         self._title = quote_plus(original_title.lower())
         self._summary = summary
+        self._source = source
 
     def calculate_avg_cos_distance_per_article(self):
         if self._embedding is None or len(self._related) == 0:

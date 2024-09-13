@@ -24,6 +24,13 @@ class ThemesService:
             },
         )
 
+    def add_theme(self, theme):
+        theme = self.theme_repo.upsert(theme)
+        return theme
+
+    def get_theme_by_title(self, title):
+        return self.theme_repo.get_by_title(quote_plus(title.lower()))
+
     def upsert_theme_from_summary(
         self,
         summary,

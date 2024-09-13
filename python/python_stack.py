@@ -114,6 +114,13 @@ class PythonStack(Stack):
                 self.langfuse_secret,
                 lambda_function_props,
             ),
+            "process_theme": self.create_lambda_function(
+                "process_theme",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                {**lambda_function_props, "timeout": Duration.minutes(5)},
+            ),
             "del_theme": self.create_lambda_function(
                 "del_theme",
                 self.sql_db,
@@ -146,6 +153,31 @@ class PythonStack(Stack):
         self.create_scheduled_event_for_function(
             "build_themes", self.functions["build_themes"], "47"
         )
+
+        # Create EventBridge rule to trigger process_theme when add_theme completes
+        events.Rule(
+            self,
+            "AddThemeCompletionRule",
+            event_pattern=events.EventPattern(
+                source=["aws.lambda"],
+                detail_type=["Lambda Function Invocation Result"],
+                detail={
+                    "requestContext": {
+                        "functionName": [self.functions["add_theme"].function_name]
+                    },
+                    "responsePayload": {"statusCode": ["202"]},
+                },
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self.functions["process_theme"],
+                    event=events.RuleTargetInput.from_event_path(
+                        "$.detail.responsePayload"
+                    ),
+                )
+            ],
+        )
+
         self.apiGateway = self.create_api_gateway_resources(self.functions)
 
         CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)

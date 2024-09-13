@@ -114,7 +114,7 @@ def test_scheduled_event_created(python_dependencies_stack):
     )
     template = assertions.Template.from_stack(stack)
 
-    template.resource_count_is("AWS::Events::Rule", 2)
+    template.resource_count_is("AWS::Events::Rule", 3)
     template.has_resource_properties(
         "AWS::Events::Rule", {"ScheduleExpression": "cron(27 8-21 ? * * *)"}
     )
@@ -127,7 +127,7 @@ def test_resources_created(python_dependencies_stack):
     )
     template = assertions.Template.from_stack(stack)
 
-    template.resource_count_is("AWS::Lambda::Function", 9)
+    template.resource_count_is("AWS::Lambda::Function", 10)
 
     template.resource_count_is("AWS::DynamoDB::Table", 1)
 
