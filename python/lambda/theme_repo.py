@@ -121,6 +121,7 @@ class ThemeRepository(BasePostgresRepository):
             return query
 
     def add(self, model):
+        logger.debug(f"Adding theme {model.title}")
         return super().add(model)
 
     def get_by_id(self, id):
@@ -175,12 +176,11 @@ class ThemeRepository(BasePostgresRepository):
                 theme = self.get_by_title(quote_plus(theme_title.lower()))
                 if theme is None:
                     theme = Theme(theme_title)
-                    session.add(theme)
+                    theme = self.add(theme)
                     logger.debug(
                         "Adding new theme",
                         extra={"theme": theme.title},
                     )
-                    session.commit()
                 association = Association(article.id, theme._id)
                 duplicate_association = (
                     session.query(Association)
@@ -228,12 +228,18 @@ class ThemeRepository(BasePostgresRepository):
 
     def upsert(self, model):
         try:
-            if self.get_by_id(model.id) is not None:
+            if self.get_by_title(model.title) is not None:
                 logger.debug(
                     "Updating existing theme",
                     extra={"theme": model.title},
                 )
                 return self.update(model)
+            else:
+                logger.debug(
+                    "Adding new theme",
+                    extra={"theme": model.title},
+                )
+                return self.add(model)
         except NoResultFound as e:
             logger.debug(
                 "Adding new theme",

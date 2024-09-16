@@ -42,10 +42,10 @@ def lambda_handler(
             response["body"] = json.dumps({"message": "Theme not found"})
             return response
 
-        embedding = openai_client.get_embedding(title)
+        embedding = openai_client.get_embedding(theme.original_title)
         related = article_repo.get(filter_embedding=embedding)
         processed_theme = theme_service.build_theme_from_related_articles(
-            related, ThemeType.CUSTOM, title, embedding
+            related, ThemeType.CUSTOM, theme.original_title, embedding
         )
 
         if processed_theme is None:

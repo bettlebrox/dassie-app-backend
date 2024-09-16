@@ -15,6 +15,7 @@ def lambda_handler(
     event,
     context,
     theme_service=None,
+    boto_event_client=None,
     useGlobal=True,
 ):
     try:
@@ -24,8 +25,10 @@ def lambda_handler(
         if init_context is None or not useGlobal:
             init_context = LambdaInitContext(
                 theme_service=theme_service,
+                boto_event_client=boto_event_client,
             )
         theme_service = init_context.theme_service
+        boto_event_client = init_context.boto_event_client
         try:
             payload = json.loads(event["body"])
             title = payload["title"]
@@ -46,7 +49,6 @@ def lambda_handler(
             response["body"] = json.dumps({"message": "Theme not added"})
             return response
         response["body"] = theme.json()
-        client = boto3.client("events")
         event_detail = {
             "requestContext": {
                 "functionName": context.function_name,
@@ -54,7 +56,7 @@ def lambda_handler(
             },
             "responsePayload": response,
         }
-        client.put_events(
+        boto_event_client.put_events(
             Entries=[
                 {
                     "Source": "dassie.lambda",

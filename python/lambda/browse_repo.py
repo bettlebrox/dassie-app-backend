@@ -8,8 +8,8 @@ from repos import BasePostgresRepository
 
 
 class BrowseRepository(BasePostgresRepository):
-    def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
-        super().__init__(username, password, dbname, db_cluster_endpoint, logger)
+    def __init__(self, username, password, dbname, db_cluster_endpoint):
+        super().__init__(username, password, dbname, db_cluster_endpoint)
         self.model = Browse
 
     def get_by_tab_id(self, tab_id):

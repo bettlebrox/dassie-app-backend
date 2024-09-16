@@ -28,6 +28,7 @@ class LambdaInitContext:
         article_service=None,
         navlog_service=None,
         browse_repo=None,
+        boto_event_client=None,
     ):
         logger.info("init lambda context")
         self._secrets_manager = secrets_manager
@@ -40,6 +41,15 @@ class LambdaInitContext:
         self._browse_repo = browse_repo
         self._browsed_repo = None
         self._navlog_service = navlog_service
+        self._boto_event_client = boto_event_client
+
+    @property
+    def boto_event_client(self):
+        if self._boto_event_client is None:
+            logger.info("init boto event client")
+            self._boto_event_client = boto3.client("events")
+        logger.debug("retrieved boto event client")
+        return self._boto_event_client
 
     @property
     def browsed_repo(self):

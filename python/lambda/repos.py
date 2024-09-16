@@ -2,10 +2,12 @@ from contextlib import closing
 from sqlalchemy import create_engine
 from models.models import Browsed
 from sqlalchemy.orm import sessionmaker
+from dassie_logger import logger
 
 
 class BasePostgresRepository:
-    def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
+    def __init__(self, username, password, dbname, db_cluster_endpoint):
+        logger.debug(f"Initializing BasePostgresRepository")
         engine = create_engine(
             f"postgresql://{username}:{password}@{db_cluster_endpoint}/{dbname}",
             pool_timeout=10,
@@ -32,10 +34,11 @@ class BasePostgresRepository:
             return self.update(model)
 
     def add(self, model):
+        logger.debug(f"Adding {self.model.__name__} {model.title}")
         with closing(self._session()) as session:
             session.add(model)
             session.commit()
-            return model
+            return session.merge(model)
 
     def delete(self, model):
         with closing(self._session()) as session:
@@ -43,6 +46,7 @@ class BasePostgresRepository:
             session.commit()
 
     def update(self, model):
+        logger.debug(f"Updating {self.model.__name__} {model.title}")
         with closing(self._session()) as session:
             detached = session.merge(model)
             session.commit()

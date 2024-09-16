@@ -49,25 +49,31 @@ def create_secret():
 def test_add_theme(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
     theme_service = MagicMock()
-    theme_service.get_theme_by_title.return_value = None
+    boto_event_client = MagicMock()
+    theme_service.get_theme_by_original_title.return_value = None
     test_theme = Theme("new theme", source=ThemeType.CUSTOM)
     theme_service.add_theme.return_value = test_theme
     mock_context.function_name = "add_theme"
     mock_context.function_version = "1"
     payload = lambda_handler(
-        event, mock_context, theme_service=theme_service, useGlobal=False
+        event,
+        mock_context,
+        theme_service=theme_service,
+        useGlobal=False,
+        boto_event_client=boto_event_client,
     )
     assert payload["statusCode"] == 202, f"status code is not 202"
     theme = json.loads(payload["body"])
     assert theme["original_title"] == "New Theme"
     assert theme["source"] == ThemeType.CUSTOM.value
+    assert boto_event_client.put_events.call_count == 1
 
 
 @mock_aws
 def test_add_theme_error(aws_credentials, create_secret, mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
     theme_service = MagicMock()
-    theme_service.get_theme_by_title.side_effect = Exception("error")
+    theme_service.get_theme_by_original_title.side_effect = Exception("error")
     payload = lambda_handler(
         event,
         mock_context,

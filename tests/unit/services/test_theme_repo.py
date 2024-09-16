@@ -81,9 +81,9 @@ def test_get_all_themes(repo: ThemeRepository, mock_query: Any):
 
 
 def test_get_theme_by_title(repo: ThemeRepository, mock_query: Any):
-    mock_query.options.return_value.filter.return_value.first.return_value = [
-        Theme(original_title="Test Theme")
-    ]
+    mock_query.options.return_value.filter.return_value.first.return_value = Theme(
+        original_title="Test Theme"
+    )
 
     # Call the get_by_title method
     theme = repo.get_by_title("test+theme")
@@ -108,18 +108,21 @@ def test_get_theme_by_titles(repo: ThemeRepository, mock_query: Any):
 
 def test_add_related_theme(repo: ThemeRepository, mock_query: Any):
     theme = Theme(original_title="Test Theme")
-    mock_query.options.return_value.filter.return_value.first.return_value = [theme]
-    mock_query.filter.return_value.first.return_value = None
-
+    theme._id = 1
+    mock_query.options.return_value.filter.return_value.first.return_value = None
+    repo._session.return_value.merge.return_value = theme
     # Create a new article and theme
     article = Article(
         original_title="Test Article",
         summary="This is a test article",
         url="https://example.com",
     )
-
+    article._id = 1
+    repo._session.return_value.query.return_value.filter.return_value.first.return_value = (
+        None
+    )
     # Call the add_related method
-    association = repo.add_related(article, ["test+theme"])
+    association = repo.add_related(article, ["Test Theme"])
 
     # Assert that the theme was added and the association was created
     repo._session.return_value.add.assert_called()
@@ -164,12 +167,9 @@ def test_upsert_existing_theme(repo: ThemeRepository, mock_query: Any):
 
 
 def test_upsert_new_theme(repo: ThemeRepository, mock_query: Any):
-    mock_query.options.return_value.filter.return_value.one.side_effect = (
-        NoResultFound()
-    )
-
+    mock_query.options.return_value.filter.return_value.first.return_value = None
     new_theme = Theme(original_title="New Theme")
-    new_theme._id = 1
+    repo._session.return_value.merge.return_value = new_theme
 
     result = repo.upsert(new_theme)
 
