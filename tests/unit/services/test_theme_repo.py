@@ -33,7 +33,7 @@ def get_top_mock_query(mock_query: Any) -> Any:
 @pytest.fixture
 def get_top_mock_query_with_source(mock_query: Any) -> Any:
     return (
-        mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
+        mock_query.join.return_value.group_by.return_value.filter.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
     )
 
 
@@ -44,20 +44,22 @@ def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
     art1._id = 1
     art2._id = 2
     article_query = (
-        mock_query.filter.return_value.join.return_value.group_by.return_value.all
+        mock_query.join.return_value.filter.return_value.group_by.return_value.all
     )
     article_query.return_value = [
         (art1._id,),
         (art2._id,),
     ]
     theme_query = (
-        mock_query.join.return_value.filter.return_value.group_by.return_value.order_by.return_value.limit
+        mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit
     )
-    theme_query.return_value = [Theme(original_title="Test Theme")]
-    results = repo.get_recently_browsed()
+    theme_query.return_value.with_entities.return_value = [
+        Theme(original_title="Test Theme")
+    ]
+    results = repo.get(1, recent_days=1, sort_by="recently_browsed")
     assert len(results) == 1
     assert results[0].original_title == "Test Theme"
-    assert (Association.article_id.in_([art.id for art in [art1, art2]])).compare(
+    assert (Association.article_id.in_([art1._id, art2._id])).compare(
         mock_query.join.return_value.filter.call_args[0][0]
     )
     article_query.assert_called_once()
@@ -204,7 +206,7 @@ def test_get_top_themes(
     ]
 
     # Call the get_top method
-    top_themes = repo.get_top(3)
+    top_themes = repo.get(3)
 
     # Assert the results
     assert len(top_themes) == 3
@@ -241,7 +243,7 @@ def test_get_top_themes_with_custom_limit(
     ]
 
     # Call the get_top method with a custom limit
-    top_themes = repo.get_top(2)
+    top_themes = repo.get(2)
 
     # Assert the results
     assert len(top_themes) == 2
@@ -259,7 +261,7 @@ def test_get_top_themes_empty_result(repo: ThemeRepository, get_top_mock_query: 
     get_top_mock_query.return_value = []
 
     # Call the get_top method
-    top_themes = repo.get_top(5)
+    top_themes = repo.get(5)
 
     # Assert the results
     assert len(top_themes) == 0
@@ -275,7 +277,7 @@ def test_get_top_themes_with_source_type(
     ]
 
     # Call the get_top method with a source type
-    top_themes = repo.get_top(2, source=[ThemeType.ARTICLE])
+    top_themes = repo.get(2, source=[ThemeType.ARTICLE])
 
     # Assert the results
     assert len(top_themes) == 2
@@ -285,23 +287,21 @@ def test_get_top_themes_with_source_type(
     # Verify the query construction with source type filter
     mock_query.join.assert_called_once_with(Association)
     assert (Theme._source.in_([ThemeType.ARTICLE])).compare(
-        mock_query.join.return_value.filter.call_args[0][0]
+        mock_query.join.return_value.group_by.return_value.filter.call_args[0][0]
     )
-    mock_query.join.return_value.filter.return_value.group_by.assert_called_once_with(
-        Theme._id
-    )
+    mock_query.join.return_value.group_by.assert_called_once_with(Theme._id)
     assert (
         func.count(Association.article_id)
         .desc()
         .compare(
-            mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.call_args[
+            mock_query.join.return_value.group_by.return_value.filter.return_value.having.return_value.order_by.call_args[
                 0
             ][
                 0
             ]
         )
     )
-    mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
+    mock_query.join.return_value.group_by.return_value.filter.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
         2
     )
 
@@ -316,7 +316,7 @@ def test_get_top_themes_without_source_type(
     ]
 
     # Call the get_top method without a source type
-    top_themes = repo.get_top(2)
+    top_themes = repo.get(2)
 
     # Assert the results
     assert len(top_themes) == 2

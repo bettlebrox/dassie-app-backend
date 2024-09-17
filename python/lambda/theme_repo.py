@@ -23,102 +23,87 @@ class ThemeRepository(BasePostgresRepository):
     def get_all(self):
         return super().get_all()
 
-    def get_recently_browsed(
-        self, limit: int = 10, source: List[ThemeType] = None, days=7
-    ):
-        logger.debug(
-            "get_recently_browsed",
-            extra={
-                "limit": limit,
-                "source": source,
-                "days": days,
-            },
-        )
-        with closing(self._session()) as session:
-            browsed_articles_ids = [
-                row[0]
-                for row in session.query(Article._id)
-                .filter(Browsed._logged_at > datetime.now() - timedelta(days=days))
-                .join(Browsed)
-                .group_by(Article._id)
-                .all()
-            ]
-            logger.info(
-                "found browsed_articles", extra={"count": len(browsed_articles_ids)}
-            )
-            query = (
-                session.query(self.model)
-                .join(Association)
-                .filter(Association.article_id.in_(browsed_articles_ids))
-            )
-            query = (
-                query.filter(self.model._source.in_(source))
-                if source is not None
-                else query
-            )
-            return (
-                query.group_by(self.model._id)
-                .order_by(self.model._updated_at.desc())
-                .limit(limit)
-            )
-
-    def get_recent(self, limit: int = 10, source: List[ThemeType] = None):
-        with closing(self._session()) as session:
-            query = session.query(self.model)
-            query = (
-                query.filter(self.model._source.in_(source))
-                if source is not None
-                else query
-            )
-            return query.order_by(self.model._updated_at.desc()).limit(limit)
-
-    def get_top(
+    def get(
         self,
         limit: int = 10,
         source: List[ThemeType] = None,
-        days: int = 0,
-        min_articles: int = 2,
+        recent_days: int = 0,
+        association_days: int = 0,
+        min_associations: int = 2,
+        filter_embedding: List[float] = None,
+        threshold: float = 0.8,
+        sort_by: str = "count_association",
     ):
         logger.debug(
-            "get_top",
+            "get",
             extra={
                 "limit": limit,
                 "source": source,
-                "days": days,
+                "association_days": association_days,
+                "min_associations": min_associations,
+                "filter_embedding": filter_embedding,
+                "threshold": threshold,
+                "sort_by": sort_by,
             },
         )
         with closing(self._session()) as session:
-            join_query = session.query(
-                self.model, func.count(Association.article_id)
-            ).join(Association)
-            join_query = (
-                join_query
-                if source is None
-                else join_query.filter(self.model._source.in_(source))
-            )
-            join_query = (
-                join_query
-                if days == 0
-                else join_query.filter(
-                    Association.created_at > datetime.now() - timedelta(days=days)
+            if recent_days > 0:
+                articles_ids = (
+                    session.query(Article._id)
+                    .join(Browsed)
+                    .filter(
+                        Browsed._logged_at
+                        > datetime.now() - timedelta(days=recent_days)
+                    )
+                    .group_by(Article.id)
+                    .all()
                 )
-            )
-            query = (
-                join_query.group_by(self.model._id)
-                .having(func.count(Association.article_id) > min_articles)
-                .order_by(func.count(Association.article_id).desc())
-            )
+                articles_ids = [article_id for (article_id,) in articles_ids]
+                query = (
+                    session.query(self.model)
+                    .join(Association)
+                    .filter(Association.article_id.in_(articles_ids))
+                    .group_by(self.model._id)
+                )
+            else:
+                query = (
+                    session.query(self.model).join(Association).group_by(self.model._id)
+                )
+
+            if source is not None:
+                query = query.filter(self.model._source.in_(source))
+
+            if association_days > 0:
+                query = query.filter(
+                    Association.created_at
+                    > datetime.now() - timedelta(days=association_days)
+                )
+
+            if filter_embedding is not None:
+                query = query.where(
+                    (1 - Theme._embedding.cosine_distance(filter_embedding)) > threshold
+                )
+            if min_associations > 0:
+                query = query.having(
+                    func.count(Association.article_id) > min_associations
+                )
+            if sort_by == "count_association":
+                query = query.order_by(func.count(Association.article_id).desc())
+            elif sort_by == "updated_at":
+                query = query.order_by(self.model._updated_at.desc())
+            elif sort_by == "recently_browsed":
+                query = query.order_by(self.model._updated_at.desc())
+
             logger.debug(
-                "get_topquery",
+                "get_query",
                 extra={
                     "query": query.statement.compile(
                         compile_kwargs={"literal_binds": True}
                     )
                 },
             )
-            query = query.limit(limit).with_entities(self.model)
 
-            return query
+            return query.limit(limit).with_entities(self.model)
 
     def add(self, model):
         logger.debug(f"Adding theme {model.title}")

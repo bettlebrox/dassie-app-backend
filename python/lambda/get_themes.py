@@ -3,26 +3,42 @@ from dassie_logger import logger
 from aws_lambda_powertools.logging import correlation_paths
 from models.theme import ThemeType
 
+VALID_SORT_FIELDS = [
+    "title",
+    "updated_at",
+    "created_at",
+    "logged_at",
+    "count_association",
+    "browse",
+    "recently_browsed",
+]
 init_context = None
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-def lambda_handler(event, context, theme_repo=None, useGlobal=True):
+def lambda_handler(event, context, theme_repo=None, openai_client=None, useGlobal=True):
     logger.debug("begin lambda_handler")
     global init_context
     if init_context is None or not useGlobal:
-        init_context = LambdaInitContext(theme_repo=theme_repo)
+        init_context = LambdaInitContext(
+            theme_repo=theme_repo, openai_client=openai_client
+        )
     theme_repo = init_context.theme_repo
+    openai_client = init_context.openai_client
     response = {"statusCode": 200, "headers": {"Access-Control-Allow-Origin": "*"}}
     try:
         sort_field = "updated_at"
         max = 10
+        filter = ""
+        filter_embedding = None
+
         params = (
             event["queryStringParameters"]
             if "queryStringParameters" in event
             and event["queryStringParameters"] is not None
             else {"max": max, "sortField": sort_field}
         )
+        filter = params["filter"] if "filter" in params else filter
         sort_field = params["sortField"] if "sortField" in params else sort_field
         source = (
             [ThemeType(source) for source in params["source"].split(",")]
@@ -39,18 +55,20 @@ def lambda_handler(event, context, theme_repo=None, useGlobal=True):
                 response["body"] = theme.json(related=True)
                 return response
         # return all themes
+        if sort_field not in VALID_SORT_FIELDS:
+            raise ValueError("Invalid sort field")
         logger.info(
             f"get_themes: sort_field: {sort_field}, source: {source}, max: {max}",
             extra={"sort_field": sort_field, "source": source, "max": max},
         )
-        if sort_field == "count_association":
-            result = theme_repo.get_top(max, source)
-        elif sort_field == "updated_at":
-            result = theme_repo.get_recent(max, source)
-        elif sort_field == "recently_browsed":
-            result = theme_repo.get_recently_browsed(max, source, days=7)
-        else:
-            raise ValueError("Invalid sort field: {}".format(sort_field))
+        if filter != "":
+            filter_embedding = openai_client.get_embedding(filter)
+        result = theme_repo.get(
+            max,
+            source,
+            filter_embedding=filter_embedding,
+            sort_by=sort_field,
+        )
         response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))
     except ValueError as error:
         logger.error("ValueError: {}".format(error), extra={"error": error})
