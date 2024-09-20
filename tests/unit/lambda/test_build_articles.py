@@ -109,7 +109,7 @@ def test_build_articles_error_handling(article_service, navlog_service, mock_con
         useGlobal=False,
     )
 
-    assert response["statusCode"] == 200
+    assert response["statusCode"] == 207
     assert "body" in response
     assert "message" in response["body"]
     body = json.loads(response["body"])

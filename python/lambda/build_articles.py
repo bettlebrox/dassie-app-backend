@@ -51,9 +51,11 @@ def lambda_handler(
             "Processing complete",
             extra={"processed": count, "skipped": skipped, "errors": errors},
         )
-
+        statusCode = 200
+        if errors > 0:
+            statusCode = 207
         return {
-            "statusCode": 200,
+            "statusCode": statusCode,
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
