@@ -29,7 +29,7 @@ def lambda_handler(
 
     try:
         # Process top themes
-        top_themes = init_context.theme_service.theme_repo.get_top(
+        top_themes = init_context.theme_service.theme_repo.get(
             100,
             source=[
                 ThemeType.TOP,
@@ -45,16 +45,14 @@ def lambda_handler(
         errors_top_themes = 0
 
         for theme in top_themes:
-            most_recent_related_article = theme.most_recent_related_article
+            most_recent_related_article = theme.related[0].created_at
             if most_recent_related_article is None:
                 logger.debug(
                     "Most recent related article is None",
                     extra={"theme_title": theme.original_title},
                 )
                 continue
-            elif most_recent_related_article.created_at > datetime.now() - timedelta(
-                hours=1
-            ):
+            elif most_recent_related_article > datetime.now() - timedelta(hours=1):
                 logger.debug(
                     "Most recent related created in the last hour",
                     extra={"theme_title": theme.original_title},

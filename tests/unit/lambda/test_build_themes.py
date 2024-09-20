@@ -38,7 +38,7 @@ def test_lambda_handler_success(
     mock_article = Article(original_title="Test Article", url="https://example.com")
     mock_article._created_at = datetime.now()
     mock_theme.related = [mock_article]
-    mock_theme_repo.get_top.return_value = [mock_theme]
+    mock_theme_repo.get.return_value = [mock_theme]
 
     mock_browse = Browse(title="Test Browse", tab_id="123")
     mock_browse._articles = [mock_article, mock_article, mock_article, mock_article]
@@ -70,7 +70,7 @@ def test_lambda_handler_llm_exception(
     mock_article = Article(original_title="Test Article", url="https://example.com")
     mock_article._created_at = datetime.now()
     mock_theme.related = [mock_article]
-    mock_theme_repo.get_top.return_value = [mock_theme]
+    mock_theme_repo.get.return_value = [mock_theme]
 
     mock_theme_service.build_theme_from_related_articles.side_effect = (
         LLMResponseException("LLM Error")
@@ -97,7 +97,7 @@ def test_lambda_handler_general_exception(
 ):
     # Setup
     mock_theme_service.theme_repo = mock_theme_repo
-    mock_theme_repo.get_top.side_effect = Exception("General Error")
+    mock_theme_repo.get.side_effect = Exception("General Error")
 
     # Execute
     result = lambda_handler(
