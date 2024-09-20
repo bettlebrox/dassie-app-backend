@@ -135,6 +135,13 @@ class PythonStack(Stack):
                 self.langfuse_secret,
                 lambda_function_props,
             ),
+            "search": self.create_lambda_function(
+                "search",
+                self.sql_db,
+                self.openai_secret,
+                self.langfuse_secret,
+                lambda_function_props,
+            ),
             "add_navlog": self.create_add_navlog_function(
                 self.lambdas_env, self.ddb, self.bucket, self.vpc, self.reqs_layers[2]
             ),
@@ -500,6 +507,22 @@ class PythonStack(Stack):
         articles.add_method(
             "GET",
             apigateway.LambdaIntegration(functions["get_articles"]),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+
+        search = api.add_resource(
+            "search",
+            default_cors_preflight_options=cors,
+        )
+        search.add_method(
+            "GET",
+            apigateway.LambdaIntegration(functions["search"]),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
+        search_sub = search.add_resource("{query}")
+        search_sub.add_method(
+            "GET",
+            apigateway.LambdaIntegration(functions["search"]),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 

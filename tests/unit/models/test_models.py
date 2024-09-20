@@ -317,7 +317,9 @@ def test_create_browsed(session):
     )
     session.add(browse)
     session.commit()
-    browsed = Browsed(article_id=article._id, browse_id=browse._id)
+    browsed = Browsed(
+        article_id=article._id, browse_id=browse._id, logged_at=datetime.now()
+    )
     session.add(browsed)
     session.commit()
 
@@ -348,12 +350,16 @@ def test_browsed_unique_constraint(session):
     session.add(browse)
     session.commit()
     # Create first browsed entry
-    browsed1 = Browsed(article_id=article._id, browse_id=browse._id)
+    browsed1 = Browsed(
+        article_id=article._id, browse_id=browse._id, logged_at=datetime.now()
+    )
     session.add(browsed1)
     session.commit()
 
     # Attempt to create a second browsed entry for the same article
-    browsed2 = Browsed(article_id=article._id, browse_id=browse._id)
+    browsed2 = Browsed(
+        article_id=article._id, browse_id=browse._id, logged_at=datetime.now()
+    )
     session.add(browsed2)
 
     # Check if an IntegrityError is raised due to unique constraint
@@ -387,7 +393,9 @@ def test_order_articles_by_browsed_count(session):
     )
     session.add(browse1)
     session.commit
-    browsed1 = Browsed(article_id=article3._id, browse_id=browse1._id)
+    browsed1 = Browsed(
+        article_id=article3._id, browse_id=browse1._id, logged_at=datetime.now()
+    )
     session.add(browsed1)
     session.commit()
     browse2 = Browse(
@@ -396,11 +404,17 @@ def test_order_articles_by_browsed_count(session):
     )
     session.add(browse2)
     session.commit()
-    browsed2 = Browsed(article_id=article3._id, browse_id=browse2._id)
+    browsed2 = Browsed(
+        article_id=article3._id, browse_id=browse2._id, logged_at=datetime.now()
+    )
     session.add(browsed2)
     session.commit()
-    browsed3 = Browsed(article_id=article2._id, browse_id=browse2._id)
-    browsed4 = Browsed(article_id=article1._id, browse_id=browse2._id)
+    browsed3 = Browsed(
+        article_id=article2._id, browse_id=browse2._id, logged_at=datetime.now()
+    )
+    browsed4 = Browsed(
+        article_id=article1._id, browse_id=browse2._id, logged_at=datetime.now()
+    )
     session.add_all([browsed3, browsed4])
     results = (
         session.query(Article)
@@ -431,7 +445,9 @@ def test_browsed_cascade_delete(session):
     session.add(browse)
     session.commit()
     # Create browsed entry
-    browsed = Browsed(article_id=article._id, browse_id=browse._id)
+    browsed = Browsed(
+        article_id=article._id, browse_id=browse._id, logged_at=datetime.now()
+    )
     session.add(browsed)
     session.commit()
 

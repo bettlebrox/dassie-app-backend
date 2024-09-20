@@ -6,7 +6,7 @@ from models.theme import Theme, ThemeType
 from models.article import Article
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_context():
     return MagicMock()
 

@@ -51,6 +51,11 @@ class Browsed(Base):
     _created_at = Column(DateTime, default=datetime.now())
     _logged_at = Column(DateTime, index=True)
 
+    def __init__(self, article_id, browse_id, logged_at):
+        self.article_id = article_id
+        self.browse_id = browse_id
+        self.logged_at = logged_at
+
     @property
     def logged_at(self):
         return self._logged_at

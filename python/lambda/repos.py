@@ -34,19 +34,20 @@ class BasePostgresRepository:
             return self.update(model)
 
     def add(self, model):
-        logger.debug(f"Adding {self.model.__name__} {model.title}")
+        logger.debug(f"Adding {self.model.__name__} {model}")
         with closing(self._session()) as session:
             session.add(model)
             session.commit()
             return session.merge(model)
 
     def delete(self, model):
+        logger.debug(f"Deleting {self.model.__name__} {model}")
         with closing(self._session()) as session:
             session.delete(model)
             session.commit()
 
     def update(self, model):
-        logger.debug(f"Updating {self.model.__name__} {model.title}")
+        logger.debug(f"Updating {self.model.__name__} {model}")
         with closing(self._session()) as session:
             detached = session.merge(model)
             session.commit()
@@ -54,8 +55,8 @@ class BasePostgresRepository:
 
 
 class BrowsedRepository(BasePostgresRepository):
-    def __init__(self, username, password, dbname, db_cluster_endpoint, logger=None):
-        super().__init__(username, password, dbname, db_cluster_endpoint, logger)
+    def __init__(self, username, password, dbname, db_cluster_endpoint):
+        super().__init__(username, password, dbname, db_cluster_endpoint)
         self.model = Browsed
 
     def get_by_browse_and_article(self, browse_id, article_id):

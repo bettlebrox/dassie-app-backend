@@ -1,14 +1,11 @@
 from typing import Any
 from unittest.mock import MagicMock
 from sqlalchemy import func
-
 import pytest
 from theme_repo import ThemeRepository
 from models.models import Association
 from models.article import Article
 from models.theme import Theme, ThemeType
-from models.browse import Browse
-from sqlalchemy.orm.exc import NoResultFound
 
 
 @pytest.fixture
