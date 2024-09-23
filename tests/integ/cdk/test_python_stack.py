@@ -116,7 +116,7 @@ def test_scheduled_event_created(python_dependencies_stack):
 
     template.resource_count_is("AWS::Events::Rule", 3)
     template.has_resource_properties(
-        "AWS::Events::Rule", {"ScheduleExpression": "cron(27 8-21 ? * * *)"}
+        "AWS::Events::Rule", {"ScheduleExpression": "cron(27 8-21 * * ? *)"}
     )
 
 

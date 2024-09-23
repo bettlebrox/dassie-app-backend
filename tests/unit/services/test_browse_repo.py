@@ -2,6 +2,8 @@ import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime
 from models.browse import Browse
+from models.article import Article
+from models.theme import Theme
 from browse_repo import BrowseRepository
 
 
@@ -86,21 +88,15 @@ def test_get_or_insert_new(browse_repo):
 def test_get_recently_browsed_date_filter(mock_datetime, browse_repo, mock_session):
     mock_now = datetime(2023, 1, 1, 12, 0, 0)
     mock_datetime.now.return_value = mock_now
-
-    mock_query = MagicMock()
-    mock_session.return_value.query.return_value = mock_query
-    mock_query.join.return_value = mock_query
-    mock_query.group_by.return_value = mock_query
-    mock_query.filter.return_value = mock_query
-    mock_query.options.return_value = mock_query
-    mock_query.limit.return_value.all.return_value = [Browse(tab_id="test_tab")]
     mock_subquery = MagicMock()
-    mock_session.return_value.query.return_value.group_by.return_value.subquery.return_value = (
+    mock_session.return_value.query.return_value.filter.return_value.subquery.return_value = (
         mock_subquery
     )
-    mock_subquery.c.max_logged_at = datetime.now()
-    mock_subquery.c._browse_id = Browse._id
-    browse_repo.get_recently_browsed(days=7)
-    mock_query.filter.assert_called_once()
-    filter_arg = mock_query.filter.call_args[0][0]
-    assert filter_arg
+    mock_session.return_value.query.return_value.join.return_value.options.return_value.limit.return_value.all.return_value = [
+        Browse(tab_id="test_tab")
+    ]
+    browse = browse_repo.get_recently_browsed(days=7)
+    assert browse[0].tab_id == "test_tab"
+    assert (Browse._id == mock_subquery.c._browse_id).compare(
+        mock_session.return_value.query.return_value.join.call_args[0][1]
+    )

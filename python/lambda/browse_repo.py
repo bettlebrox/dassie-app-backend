@@ -27,16 +27,14 @@ class BrowseRepository(BasePostgresRepository):
             subquery = (
                 session.query(
                     Browsed._browse_id,
-                    func.max(Browsed._logged_at).label("max_logged_at"),
                 )
-                .group_by(Browsed._browse_id)
+                .filter(Browsed._logged_at > cut_off_date)
                 .subquery()
             )
 
             return (
                 session.query(self.model)
                 .join(subquery, self.model._id == subquery.c._browse_id)
-                .filter(subquery.c.max_logged_at > cut_off_date)
                 .options(joinedload(Browse._articles))
                 .limit(limit)
                 .all()

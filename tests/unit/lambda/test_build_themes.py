@@ -35,6 +35,7 @@ def test_lambda_handler_success(
     # Setup
     mock_theme_service.theme_repo = mock_theme_repo
     mock_theme = Theme(original_title="Test Theme")
+    mock_theme._updated_at = datetime.now() - timedelta(hours=2)
     mock_article = Article(original_title="Test Article", url="https://example.com")
     mock_article._created_at = datetime.now()
     mock_theme.related = [mock_article]
@@ -67,6 +68,7 @@ def test_lambda_handler_llm_exception(
     # Setup
     mock_theme_service.theme_repo = mock_theme_repo
     mock_theme = Theme(original_title="Test Theme")
+    mock_theme._updated_at = datetime.now() - timedelta(hours=2)
     mock_article = Article(original_title="Test Article", url="https://example.com")
     mock_article._created_at = datetime.now()
     mock_theme.related = [mock_article]

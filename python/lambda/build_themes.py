@@ -37,8 +37,8 @@ def lambda_handler(
                 ThemeType.RECURRENT,
                 ThemeType.SPORADIC,
             ],
-            days=1,
-            min_articles=3,
+            association_days=1,
+            min_associations=2,
         )
 
         processed_top_themes = 0
@@ -52,9 +52,9 @@ def lambda_handler(
                     extra={"theme_title": theme.original_title},
                 )
                 continue
-            elif most_recent_related_article > datetime.now() - timedelta(hours=1):
+            elif most_recent_related_article > theme.updated_at:
                 logger.debug(
-                    "Most recent related created in the last hour",
+                    "Most recent related created after theme updated",
                     extra={"theme_title": theme.original_title},
                 )
                 try:

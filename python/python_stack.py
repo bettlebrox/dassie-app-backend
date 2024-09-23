@@ -565,12 +565,11 @@ class PythonStack(Stack):
         return apiGateway
 
     def create_scheduled_event_for_function(self, name, function, minute):
-        # Create a rule that runs every day at 2:00 AM UTC
         rule = events.Rule(
             self,
             name + "ScheduleRule",
             schedule=events.Schedule.cron(
-                minute=minute, hour="8-21", month="*", week_day="*", year="*"
+                minute=minute, hour="8-21", month="*", day="*", year="*"
             ),
         )
 
