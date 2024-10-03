@@ -35,11 +35,11 @@ def test_search_with_query(
 
     mock_article = MagicMock()
     mock_article.json.return_value = {"id": "1", "title": "Test Article"}
-    mock_article_repo.get.return_value = [mock_article]
+    mock_article_repo.get.return_value = [(mock_article, 0.9)]
 
     mock_theme = MagicMock()
     mock_theme.json.return_value = {"id": "1", "title": "Test Theme"}
-    mock_theme_repo.get.return_value = [mock_theme]
+    mock_theme_repo.get.return_value = [(mock_theme, 0.9)]
 
     response = lambda_handler(
         event,

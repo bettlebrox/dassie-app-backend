@@ -123,7 +123,7 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         [ThemeType.TOP],  # default is TOP
         filter_embedding=None,
         sort_by="recently_browsed",
-        recent_browsed_days=3,
+        recent_browsed_days=14,
     )
     response = lambda_handler(
         {
