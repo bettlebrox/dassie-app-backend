@@ -8,6 +8,9 @@ from sqlalchemy import pool
 import boto3
 import json
 import os
+import dotenv
+
+dotenv.load_dotenv("local.env")
 
 db_endpoint = os.environ["DB_CLUSTER_ENDPOINT"]
 secretsmanager = boto3.client("secretsmanager")

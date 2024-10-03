@@ -1,6 +1,8 @@
 from dassie_logger import logger
 from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
+from models.article import ArticleType
+import json
 
 init_context = None
 
@@ -33,13 +35,19 @@ def lambda_handler(
             else ""
         )
         embedding = openai_client.get_embedding(search_query)
-        articles = article_repo.get(filter_embedding=embedding)
-        themes = theme_repo.get(filter_embedding=embedding)
-        import json
+        articles = article_repo.get(
+            filter_embedding=embedding, threshold=0.5, type=[ArticleType.ARTICLE]
+        )
+        themes = theme_repo.get(filter_embedding=embedding, threshold=0.5)
 
         combined_results = {
-            "articles": [article.json(dump=False) for article in articles],
-            "themes": [theme.json(dump=False) for theme in themes],
+            "articles": [
+                {**article.json(dump=False), "score": score}
+                for article, score in articles
+            ],
+            "themes": [
+                {**theme.json(dump=False), "score": score} for theme, score in themes
+            ],
         }
         response["body"] = json.dumps(combined_results)
     except Exception as error:

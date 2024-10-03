@@ -77,7 +77,7 @@ def test_get_articles_by_theme(article_repo, mock_where):
         (1 - Article._embedding.cosine_distance(query_embedding)) > 0.8
     )
     assert mock_where.return_value.order_by.call_args[0][0].compare(
-        Article._embedding.cosine_distance(query_embedding).desc()
+        (1 - Article._embedding.cosine_distance(query_embedding)).desc()
     )
 
 

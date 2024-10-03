@@ -27,12 +27,12 @@ class ThemeRepository(BasePostgresRepository):
         self,
         limit: int = 10,
         source: List[ThemeType] = None,
-        recent_days: int = 0,
+        recent_browsed_days: int = 0,
         association_days: int = 0,
         min_associations: int = 2,
         filter_embedding: List[float] = None,
         threshold: float = 0.8,
-        sort_by: str = "count_association",
+        sort_by=None,
     ):
         logger.debug(
             "get",
@@ -47,15 +47,15 @@ class ThemeRepository(BasePostgresRepository):
             },
         )
         with closing(self._session()) as session:
-            if recent_days > 0:
+            if recent_browsed_days > 0:
                 articles_ids = (
                     session.query(Article._id)
                     .join(Browsed)
                     .filter(
                         Browsed._logged_at
-                        > datetime.now() - timedelta(days=recent_days)
+                        > datetime.now() - timedelta(days=recent_browsed_days)
                     )
-                    .group_by(Article.id)
+                    .group_by(Article._id)
                     .all()
                 )
                 articles_ids = [article_id for (article_id,) in articles_ids]
@@ -68,6 +68,13 @@ class ThemeRepository(BasePostgresRepository):
             else:
                 query = (
                     session.query(self.model).join(Association).group_by(self.model._id)
+                    if filter_embedding is None
+                    else session.query(
+                        self.model,
+                        1 - Theme._embedding.cosine_distance(filter_embedding),
+                    )
+                    .join(Association)
+                    .group_by(self.model._id)
                 )
 
             if source is not None:
@@ -87,12 +94,20 @@ class ThemeRepository(BasePostgresRepository):
                 query = query.having(
                     func.count(Association.article_id) > min_associations
                 )
+            if sort_by is None:
+                sort_by = "count_association"
+                if filter_embedding is not None:
+                    sort_by = "embedding"
             if sort_by == "count_association":
                 query = query.order_by(func.count(Association.article_id).desc())
             elif sort_by == "updated_at":
                 query = query.order_by(self.model._updated_at.desc())
             elif sort_by == "recently_browsed":
-                query = query.order_by(self.model._updated_at.desc())
+                query = query.order_by(func.max(Association.created_at).desc())
+            elif sort_by == "embedding":
+                query = query.order_by(
+                    (1 - Theme._embedding.cosine_distance(filter_embedding)).desc()
+                )
 
             logger.debug(
                 "get_query",
@@ -103,7 +118,7 @@ class ThemeRepository(BasePostgresRepository):
                 },
             )
 
-            return query.limit(limit).with_entities(self.model)
+            return query.limit(limit)
 
     def add(self, model):
         logger.debug(f"Adding theme {model.title}")

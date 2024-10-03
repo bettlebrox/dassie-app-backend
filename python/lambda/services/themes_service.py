@@ -54,7 +54,7 @@ class ThemesService:
             else theme
         )
         theme.summary = summary["summary"]
-        if theme.source is None:
+        if theme.source is None or theme.source != theme_type:
             theme.source = theme_type
             logger.debug("Set theme source", extra={"theme": theme.title})
         if given_embedding is None and theme.embedding is None:

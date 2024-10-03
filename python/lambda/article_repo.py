@@ -5,7 +5,7 @@ from contextlib import closing
 from typing import List
 from models.models import Association, Browsed
 from models.theme import Theme
-from models.article import Article
+from models.article import Article, ArticleType
 from repos import BasePostgresRepository
 from dassie_logger import logger
 
@@ -62,7 +62,8 @@ class ArticleRepository(BasePostgresRepository):
     def get(
         self,
         limit: int = 20,
-        sort_by="logged_at",
+        type: List[ArticleType] = None,
+        sort_by=None,
         descending=True,
         filter_embedding=None,
         threshold: float = 0.8,
@@ -71,7 +72,9 @@ class ArticleRepository(BasePostgresRepository):
         with closing(self._session()) as session:
             query = session.query(self.model)
             query = (
-                query.where(
+                session.query(
+                    self.model, 1 - Article._embedding.cosine_distance(filter_embedding)
+                ).where(
                     (1 - Article._embedding.cosine_distance(filter_embedding))
                     > threshold
                 )
@@ -83,6 +86,12 @@ class ArticleRepository(BasePostgresRepository):
                 if days is not None
                 else query
             )
+            if type is not None:
+                query = query.where(Article._type.in_(type))
+            if sort_by is None:
+                sort_by = "logged_at"
+                if filter_embedding is not None:
+                    sort_by = "embedding"
             query = self._append_sort_by(query, sort_by, descending, filter_embedding)
             query = query.options(joinedload(self.model._themes))
             logger.debug("embedding query", extra={"query": query})
@@ -93,7 +102,7 @@ class ArticleRepository(BasePostgresRepository):
             query = query.join(Browsed).group_by(self.model._id)
             order_by_func = func.count(Browsed._browse_id)
         elif sort_by == "embedding":
-            order_by_func = Article._embedding.cosine_distance(filter_embedding)
+            order_by_func = 1 - Article._embedding.cosine_distance(filter_embedding)
         else:
             try:
                 order_by_func = self.model.__dict__["_" + sort_by]

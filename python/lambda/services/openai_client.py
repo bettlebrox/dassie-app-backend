@@ -1,4 +1,5 @@
 import json
+from openai import NOT_GIVEN
 import tiktoken
 from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
@@ -37,7 +38,11 @@ class OpenAIClient:
         themes, list of themes up to a maximum of three.
         ---
     """
-
+    ARTICLE_ENTITIES_PROMPT = """Your task is to identity the entities and relations that are the subject of the following text. 
+    Use dbpedia ontologies to model the entities and relations. Output in turtle rdf format."""
+    ARTICLE_OPEN_CYPHER_PROMPT = """Your task is to validate that each of the following entities and relations in the turtle are grounded in the text. 
+    Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist. 
+    Include an Article entity with id {article_id} that relates to all the other entities as the source of the information."""
     TEMPERATURE = 0
 
     def __init__(self, api_key, langfuse_key):
@@ -64,7 +69,12 @@ class OpenAIClient:
 
     @observe()
     def get_completion(
-        self, prompt, query, model=MODEL, min_text_length=MIN_TEXT_LENGTH
+        self,
+        prompt,
+        query,
+        model=MODEL,
+        min_text_length=MIN_TEXT_LENGTH,
+        json_response=True,
     ):
         if len(query) < min_text_length:
             logger.info("query too short")
@@ -80,19 +90,56 @@ class OpenAIClient:
                     model=model,
                     messages=messages,
                     temperature=self.TEMPERATURE,
-                    response_format={"type": "json_object"},
+                    response_format=(
+                        {"type": "json_object"} if json_response else NOT_GIVEN
+                    ),
                 )
                 logger.debug("get_completion response")
             except Exception as error:
                 logger.exception("get_completion Error")
                 response = error
-            return json.loads(response.choices[0].message.content)
+            return (
+                json.loads(response.choices[0].message.content)
+                if json_response
+                else response.choices[0].message.content
+            )
         except json.decoder.JSONDecodeError as error:
             logger.exception("get_completion JSON decoding Error")
             raise LLMResponseException(error)
         except Exception as error:
             logger.exception("get_completion Error")
         return None
+
+    @observe()
+    def get_article_graph(self, article, article_id, model="gpt-4o"):
+        if len(article) < self.MIN_TEXT_LENGTH:
+            logger.info("article too short")
+            return None
+        entities = self.get_completion(
+            self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
+        )
+        open_cypher = self.get_completion(
+            self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
+            entities + "\n---\n" + article,
+            model=model,
+            json_response=False,
+        )
+        return self._get_opencypher_code_block(open_cypher)
+
+    def _get_opencypher_code_block(self, open_cypher):
+        start_opencypher_code_block = -1
+        end_opencypher_code_block = len(open_cypher)
+        opencypher_start = open_cypher.find("```opencypher")
+        if opencypher_start == -1:
+            cypher_start = open_cypher.find("```cypher")
+        if opencypher_start != -1:
+            start_opencypher_code_block = opencypher_start + len("```opencypher")
+        elif cypher_start != -1:
+            start_opencypher_code_block = cypher_start + len("```cypher")
+        opencypher_end = open_cypher.rfind("```")
+        if opencypher_end != -1 and opencypher_end > start_opencypher_code_block:
+            end_opencypher_code_block = opencypher_end
+        return open_cypher[start_opencypher_code_block:end_opencypher_code_block]
 
     @observe()
     def get_article_summarization(self, article, model=MODEL):

@@ -1,17 +1,24 @@
 from datetime import datetime
+import enum
 import json
 from urllib.parse import quote_plus, unquote_plus
 import uuid
-from sqlalchemy import UUID, Column, DateTime, Integer, String
+from sqlalchemy import UUID, Column, DateTime, Enum, Integer, String
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
 from models.models import Base
+
+
+class ArticleType(enum.Enum):
+    ARTICLE = "article"
+    SEARCH_RESULT = "search_result"
 
 
 class Article(Base):
     __tablename__ = "article"
     _id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     _title = Column(String)
+    _type = Column(Enum(ArticleType), default=ArticleType.ARTICLE)
     _summary = Column(String)
     _created_at = Column(DateTime, default=datetime.now())
     _logged_at = Column(DateTime, index=True)
@@ -38,6 +45,11 @@ class Article(Base):
         self._logged_at = logged_at
         self._text = text
         self._token_count = 0
+        self._type = (
+            ArticleType.ARTICLE
+            if not self._title.endswith("- Google Search")
+            else ArticleType.SEARCH_RESULT
+        )
 
     def json(self, dump=True) -> str:
         json_obj = {
@@ -61,6 +73,10 @@ class Article(Base):
             "themes": [theme.json(dump=False) for theme in self._themes],
         }
         return json.dumps(json_obj) if dump else json_obj
+
+    @property
+    def type(self):
+        return self._type
 
     @property
     def browses(self):

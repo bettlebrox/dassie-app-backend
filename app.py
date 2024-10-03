@@ -14,7 +14,7 @@ from python_dependencies_stack import PythonDependenciesStack
 
 app = cdk.App()
 stack_name = (
-    "TodoAppBackendStack-nwbxl" if "LOCAL_TESTING" not in os.environ else "PythonStack"
+    "TodoAppBackendStack-nwbxl" if "LOCAL_TESTING" not in os.environ else "LocalStack"
 )
 python_dependencies_stack = PythonDependenciesStack(
     app, "DassiePythonDependenciesStack"

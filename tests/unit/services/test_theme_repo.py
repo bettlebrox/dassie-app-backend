@@ -23,14 +23,14 @@ def mock_query(repo: ThemeRepository) -> Any:
 @pytest.fixture
 def get_top_mock_query(mock_query: Any) -> Any:
     return (
-        mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
+        mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit
     )
 
 
 @pytest.fixture
 def get_top_mock_query_with_source(mock_query: Any) -> Any:
     return (
-        mock_query.join.return_value.group_by.return_value.filter.return_value.having.return_value.order_by.return_value.limit.return_value.with_entities
+        mock_query.join.return_value.group_by.return_value.filter.return_value.having.return_value.order_by.return_value.limit
     )
 
 
@@ -50,10 +50,8 @@ def test_get_recently_browsed_themes(repo: ThemeRepository, mock_query: Any):
     theme_query = (
         mock_query.join.return_value.filter.return_value.group_by.return_value.having.return_value.order_by.return_value.limit
     )
-    theme_query.return_value.with_entities.return_value = [
-        Theme(original_title="Test Theme")
-    ]
-    results = repo.get(1, recent_days=1, sort_by="recently_browsed")
+    theme_query.return_value = [Theme(original_title="Test Theme")]
+    results = repo.get(1, recent_browsed_days=1, sort_by="recently_browsed")
     assert len(results) == 1
     assert results[0].original_title == "Test Theme"
     assert (Association.article_id.in_([art1._id, art2._id])).compare(

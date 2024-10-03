@@ -1,9 +1,10 @@
 import json
 from os import path
 import os
-from aws_cdk import Fn, Stack, CfnOutput, Duration
+from aws_cdk import Stack, CfnOutput, Duration, TimeZone
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
+import aws_cdk.aws_applicationautoscaling as appscaling
 import aws_cdk.aws_lambda_python_alpha as lambda_python
 import aws_cdk.aws_apigateway as apigateway
 import aws_cdk.aws_dynamodb as dynamodb
@@ -84,7 +85,7 @@ class PythonStack(Stack):
                 self.sql_db,
                 self.openai_secret,
                 self.langfuse_secret,
-                {**lambda_function_props, "timeout": Duration.seconds(120)},
+                {**lambda_function_props, "timeout": Duration.seconds(240)},
             ),
             "build_themes": self.create_lambda_function(
                 "build_themes",
@@ -194,6 +195,17 @@ class PythonStack(Stack):
                 )
             ],
         )
+
+        if construct_id != "LocalStack":
+            self.functions["get_themes"] = self.create_auto_scaling_for_lambda(
+                self.functions["get_themes"]
+            )
+            self.functions["search"] = self.create_auto_scaling_for_lambda(
+                self.functions["search"]
+            )
+            self.functions["add_theme"] = self.create_auto_scaling_for_lambda(
+                self.functions["add_theme"]
+            )
 
         self.apiGateway = self.create_api_gateway_resources(self.functions)
 
@@ -428,6 +440,36 @@ class PythonStack(Stack):
             lambda_function, sql_db, openai_secret, langfuse_secret
         )
         return lambda_function
+
+    def create_auto_scaling_for_lambda(self, lambda_function: lambda_.Function):
+        alias = lambda_function.add_alias("provisioned")
+        auto_scaling_target = alias.add_auto_scaling(min_capacity=1, max_capacity=3)
+        auto_scaling_target.scale_on_utilization(utilization_target=0.5)
+        auto_scaling_target.scale_on_schedule(
+            "scale-up-in-the-morning",
+            schedule=appscaling.Schedule.cron(
+                minute="0",
+                hour="8",
+                day="*",
+                month="*",
+                year="*",
+            ),
+            time_zone=TimeZone.EUROPE_DUBLIN,
+            min_capacity=1,
+        )
+        auto_scaling_target.scale_on_schedule(
+            "scale-down-in-the-evening",
+            schedule=appscaling.Schedule.cron(
+                minute="0",
+                hour="20",
+                day="*",
+                month="*",
+                year="*",
+            ),
+            time_zone=TimeZone.EUROPE_DUBLIN,
+            min_capacity=0,
+        )
+        return alias
 
     def create_api_gateway_dependencies(self):
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")

@@ -31,6 +31,7 @@ def lambda_handler(event, context, theme_repo=None, openai_client=None, useGloba
         max = 10
         filter = ""
         filter_embedding = None
+        recent_browsed_days = 0
 
         params = (
             event["queryStringParameters"]
@@ -61,6 +62,8 @@ def lambda_handler(event, context, theme_repo=None, openai_client=None, useGloba
             f"get_themes: sort_field: {sort_field}, source: {source}, max: {max}",
             extra={"sort_field": sort_field, "source": source, "max": max},
         )
+        if sort_field == "recently_browsed":
+            recent_browsed_days = 14
         if filter != "":
             filter_embedding = openai_client.get_embedding(filter)
         result = theme_repo.get(
@@ -68,6 +71,7 @@ def lambda_handler(event, context, theme_repo=None, openai_client=None, useGloba
             source,
             filter_embedding=filter_embedding,
             sort_by=sort_field,
+            recent_browsed_days=recent_browsed_days,
         )
         response["body"] = "[{}]".format(",".join([theme.json() for theme in result]))
     except ValueError as error:

@@ -85,6 +85,7 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         [ThemeType.TOP],  # default is TOP
         filter_embedding=None,
         sort_by="count_association",
+        recent_browsed_days=0,
     )
     response = lambda_handler(
         {
@@ -102,6 +103,7 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         [ThemeType.TOP],  # default is TOP
         filter_embedding=None,
         sort_by="updated_at",
+        recent_browsed_days=0,
     )
     response = lambda_handler(
         {
@@ -121,6 +123,7 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         [ThemeType.TOP],  # default is TOP
         filter_embedding=None,
         sort_by="recently_browsed",
+        recent_browsed_days=3,
     )
     response = lambda_handler(
         {
@@ -137,7 +140,11 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         useGlobal=False,
     )
     theme_repo.get.assert_called_with(
-        2, [ThemeType.CUSTOM], filter_embedding=None, sort_by="updated_at"
+        2,
+        [ThemeType.CUSTOM],
+        filter_embedding=None,
+        sort_by="updated_at",
+        recent_browsed_days=0,
     )
     assert response["statusCode"] == 200
     response = lambda_handler(
@@ -159,5 +166,6 @@ def test_get_themes_with_params(theme_repo, openai_client, mock_context):
         [ThemeType.CUSTOM, ThemeType.TOP],
         filter_embedding=None,
         sort_by="updated_at",
+        recent_browsed_days=0,
     )
     assert response["statusCode"] == 200
