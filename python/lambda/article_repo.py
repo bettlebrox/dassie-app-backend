@@ -76,7 +76,12 @@ class ArticleRepository(BasePostgresRepository):
             query = (
                 session.query(
                     self.model, 1 - Article._embedding.cosine_distance(filter_embedding)
-                ).where(
+                )
+                if include_score_in_results
+                else query
+            )
+            query = (
+                query.where(
                     (1 - Article._embedding.cosine_distance(filter_embedding))
                     > threshold
                 )
