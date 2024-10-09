@@ -85,7 +85,7 @@ class ArticleRepository(BasePostgresRepository):
                     (1 - Article._embedding.cosine_distance(filter_embedding))
                     > threshold
                 )
-                if filter_embedding is not None and include_score_in_results
+                if filter_embedding is not None
                 else query
             )
             query = (
