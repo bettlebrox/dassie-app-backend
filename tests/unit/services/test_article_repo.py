@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import func
 from models.article import Article
 from models.models import Browsed
+from models.browse import Browse
 from models.theme import Theme
 from article_repo import ArticleRepository
 
@@ -71,7 +72,11 @@ def test_get_articles_by_theme(article_repo, mock_where):
     mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
         articles
     )
-    articles = article_repo.get(filter_embedding=query_embedding, sort_by="embedding")
+    articles = article_repo.get(
+        filter_embedding=query_embedding,
+        sort_by="embedding",
+        include_score_in_results=True,
+    )
     assert len(articles) > 0
     assert mock_where.call_args[0][0].compare(
         (1 - Article._embedding.cosine_distance(query_embedding)) > 0.8
@@ -145,7 +150,9 @@ def test_get_articles_exception_handling(article_repo):
 
 def test_get_articles_with_embedding(article_repo, mock_where):
     embedding = [0.1, 0.2, 0.3]
-    article_repo.get(filter_embedding=embedding, threshold=0.7)
+    article_repo.get(
+        filter_embedding=embedding, threshold=0.7, include_score_in_results=True
+    )
 
     mock_where.assert_called()
 
@@ -301,7 +308,8 @@ def test_get_article_by_id():
     repo._session = mock_session
 
     # Call the get_by_id method
-    article = repo.get_by_id(1)
+    article_id = "550e8400-e29b-41d4-a716-446655440000"  # Mocked UUID
+    article = repo.get_by_id(article_id)
 
     # Assert the result
     assert article._title == quote_plus("Test Article").lower()
@@ -364,7 +372,9 @@ def test_get_with_embedding_filter(article_repo, mock_where, mock_query):
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
-    result = article_repo.get(filter_embedding=[0.1, 0.2, 0.3], threshold=0.9)
+    result = article_repo.get(
+        filter_embedding=[0.1, 0.2, 0.3], threshold=0.9, include_score_in_results=True
+    )
 
     assert len(result) == 1
     mock_where.assert_called_once()

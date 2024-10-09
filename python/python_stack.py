@@ -147,7 +147,7 @@ class PythonStack(Stack):
                 self.lambdas_env, self.ddb, self.bucket, self.vpc, self.reqs_layers[2]
             ),
         }
-        self.ddb.grant_read_data(self.functions["build_articles"])
+        self.ddb.grant_read_write_data(self.functions["build_articles"])
         functions_to_dd_instrument = list(self.functions.values())
         functions_to_dd_instrument.append(self.archive_navlog)
         self.instrument_with_datadog(functions_to_dd_instrument)

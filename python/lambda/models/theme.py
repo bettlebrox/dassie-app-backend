@@ -8,7 +8,6 @@ import numpy as np
 from sqlalchemy import UUID, Column, DateTime, Enum, Float, String
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.orm import relationship
-from models.article import Article
 from models.models import JsonFunctionEncoder, Recurrent, Sporadic
 from models.models import Base
 
@@ -35,7 +34,7 @@ class Theme(Base):
     _embedding = Column(Vector(1536))
     _avg_article_distance = Column(Float, default=0.0)
     _related = relationship(
-        "Article", secondary="association", order_by=Article._updated_at.desc()
+        "Article", secondary="association", order_by="Article._updated_at.desc()"
     )
     _recurrent = relationship(
         "Theme",
@@ -124,7 +123,7 @@ class Theme(Base):
         return self._related
 
     @related.setter
-    def related(self, value: List[Article]):
+    def related(self, value):
         self._related = value
         self._avg_article_distance = self.calculate_avg_cos_distance_per_article()
 

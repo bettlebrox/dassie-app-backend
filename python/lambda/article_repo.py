@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from sqlalchemy.orm.strategy_options import defer, joinedload
+from sqlalchemy.orm.strategy_options import joinedload
 from sqlalchemy import func
 from contextlib import closing
 from typing import List
@@ -8,6 +8,7 @@ from models.theme import Theme
 from models.article import Article, ArticleType
 from repos import BasePostgresRepository
 from dassie_logger import logger
+from uuid import UUID as PyUUID
 
 
 class ArticleRepository(BasePostgresRepository):
@@ -15,14 +16,14 @@ class ArticleRepository(BasePostgresRepository):
         super().__init__(username, password, dbname, db_cluster_endpoint)
         self.model = Article
 
-    def get_by_id(self, id):
+    def get_by_id(self, id: str):
         with closing(self._session()) as session:
             return (
                 session.query(self.model)
                 .options(
                     joinedload(self.model._themes),
                 )
-                .filter(self.model._id == id)
+                .filter(self.model._id == PyUUID(id))
                 .one()
             )
 
@@ -66,6 +67,7 @@ class ArticleRepository(BasePostgresRepository):
         sort_by=None,
         descending=True,
         filter_embedding=None,
+        include_score_in_results=False,
         threshold: float = 0.8,
         days: int = None,
     ):
@@ -78,7 +80,7 @@ class ArticleRepository(BasePostgresRepository):
                     (1 - Article._embedding.cosine_distance(filter_embedding))
                     > threshold
                 )
-                if filter_embedding is not None
+                if filter_embedding is not None and include_score_in_results
                 else query
             )
             query = (

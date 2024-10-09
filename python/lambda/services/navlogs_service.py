@@ -21,6 +21,11 @@ class NavlogService:
         ddb_table.put_item(Item=navlog)
         return json.dumps(navlog)
 
+    def delete_navlog(self, navlog_id):
+        ddb_table = self._dynamodb.Table(self._table_name)
+        ddb_table.delete_item(Key={"id": navlog_id})
+        return True
+
     def get_content_navlogs(self):
         ddb_table = self._dynamodb.Table(self._table_name)
         response = ddb_table.query(

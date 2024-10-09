@@ -1,3 +1,4 @@
+import os
 import json
 from openai import NOT_GIVEN
 import tiktoken
@@ -38,19 +39,24 @@ class OpenAIClient:
         themes, list of themes up to a maximum of three.
         ---
     """
-    ARTICLE_ENTITIES_PROMPT = """Your task is to identity the entities and relations that are the subject of the following text. 
+    ARTICLE_ENTITIES_PROMPT = """Your task is to identify the entities and relations that are the subject of the following text. 
     Use dbpedia ontologies to model the entities and relations. Output in turtle rdf format."""
     ARTICLE_OPEN_CYPHER_PROMPT = """Your task is to validate that each of the following entities and relations in the turtle are grounded in the text. 
-    Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist. 
-    Include an Article entity with id {article_id} that relates to all the other entities as the source of the information."""
+    Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist."""
     TEMPERATURE = 0
 
     def __init__(self, api_key, langfuse_key):
         self.openai_client = OpenAI(api_key=api_key)
+        release = "dev"
+        try:
+            release = os.environ["DD_TAGS"]
+        except KeyError:
+            pass
         langfuse_context.configure(
             secret_key=langfuse_key,
             public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
             host="https://cloud.langfuse.com",
+            release=release,
         )
 
     @observe()
@@ -111,15 +117,15 @@ class OpenAIClient:
         return None
 
     @observe()
-    def get_article_graph(self, article, article_id, model="gpt-4o"):
+    def get_article_graph(self, article, article_id, model="gpt-4o-mini"):
         if len(article) < self.MIN_TEXT_LENGTH:
-            logger.info("article too short")
+            logger.info(f"article too short: {article_id}")
             return None
         entities = self.get_completion(
             self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
         )
         open_cypher = self.get_completion(
-            self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
+            self.ARTICLE_OPEN_CYPHER_PROMPT,
             entities + "\n---\n" + article,
             model=model,
             json_response=False,

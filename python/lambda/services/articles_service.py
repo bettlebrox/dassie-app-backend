@@ -1,9 +1,14 @@
 from datetime import datetime, timedelta
+from article_repo import ArticleRepository
+from browse_repo import BrowseRepository
 from dassie_logger import logger
 
 from models.browse import Browse
 from models.models import Browsed
 from models.article import Article
+from repos import BrowsedRepository
+from services.openai_client import OpenAIClient
+from theme_repo import ThemeRepository
 
 
 class ArticlesService:
@@ -11,7 +16,12 @@ class ArticlesService:
     STALE_ARTICLE_THRESHOLD = 90
 
     def __init__(
-        self, article_repo, theme_repo, browse_repo, browsed_repo, openai_client
+        self,
+        article_repo: ArticleRepository,
+        theme_repo: ThemeRepository,
+        browse_repo: BrowseRepository,
+        browsed_repo: BrowsedRepository,
+        openai_client: OpenAIClient,
     ):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
@@ -62,12 +72,19 @@ class ArticlesService:
             current_article.token_count = token_count
             current_article.updated_at = datetime.now()
             self._article_repo.update(current_article)
-        if "themes" in article_summary and article_summary["themes"] is not None:
-            logger.info(
-                "Adding article themes",
-                extra={"themes": article_summary["themes"]},
-            )
-            self._theme_repo.add_related(current_article, article_summary["themes"])
+        themes = []
+        themes = [
+            theme.original_title
+            for theme in self._theme_repo.get(filter_embedding=embedding, limit=3)
+        ]
+        if (
+            "themes" in article_summary
+            and article_summary["themes"] is not None
+            and len(themes) < 3
+        ):
+            themes = list(set(article_summary["themes"]) + set(themes))
+        if themes.sorted() != current_article.themes.sorted():
+            self._theme_repo.add_related(current_article, themes)
 
     def get_search_terms_from_article(self, article):
         if article.original_title.endswith("- Google Search"):

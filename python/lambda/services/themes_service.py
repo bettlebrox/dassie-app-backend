@@ -1,5 +1,7 @@
+from typing import List
 from urllib.parse import quote_plus
 from dassie_logger import logger
+from models.article import Article
 from models.theme import Theme, ThemeType
 from services.openai_client import LLMResponseException, OpenAIClient
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -128,7 +130,11 @@ class ThemesService:
             return []
 
     def build_theme_from_related_articles(
-        self, articles, theme_type, original_title=None, given_embedding=None
+        self,
+        articles: List[Article],
+        theme_type,
+        original_title=None,
+        given_embedding=None,
     ):
         total_tokens = sum([a.token_count for a in articles])
         logger.info(

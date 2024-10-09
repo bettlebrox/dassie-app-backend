@@ -36,7 +36,10 @@ def lambda_handler(
         )
         embedding = openai_client.get_embedding(search_query)
         articles = article_repo.get(
-            filter_embedding=embedding, threshold=0.5, type=[ArticleType.ARTICLE]
+            filter_embedding=embedding,
+            threshold=0.5,
+            type=[ArticleType.ARTICLE],
+            include_score_in_results=True,
         )
         themes = theme_repo.get(filter_embedding=embedding, threshold=0.5)
 
