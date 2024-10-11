@@ -6,7 +6,9 @@ import json
 
 @pytest.fixture
 def openai_client():
-    return OpenAIClient(api_key="test_api_key", langfuse_key="test_langfuse_key")
+    return OpenAIClient(
+        api_key="test_api_key", langfuse_key="test_langfuse_key", langfuse_enabled=False
+    )
 
 
 def test_get_embedding(openai_client):

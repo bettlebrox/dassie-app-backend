@@ -33,9 +33,11 @@ class NeptuneClient:
     def query(
         self,
         query,
+        rewrite_query=True,
     ):
         try:
-            query = self._remove_unsupported_from_query(query)
+            if rewrite_query:
+                query = self._remove_unsupported_from_query(query)
             logger.info(f"Neptune query: {query}")
             response = self.client.execute_open_cypher_query(openCypherQuery=query)
             logger.info(f"Neptune query response: {response}")
@@ -61,52 +63,34 @@ class NeptuneClient:
         return query
 
     @observe()
-    def upsert_article_graph(self, article: Article, trace_id: str):
+    def upsert_article_graph(self, article: Article, subject_graph: str, trace_id: str):
         self._upsert_article(article, trace_id)
+        self.query(subject_graph)
         self._scope_updated_graph(article.id, trace_id)
 
     @observe()
     def _scope_updated_graph(self, article_id: str, trace_id: str):
-        try:
-            response = self.client.execute_open_cypher_query(
-                openCypherQuery=f"""
-                match (n)
-                where n.domain is null
-                set n.domain = "dassie_subject"
-                with n
-                match (a:Article {{id: "{article_id}"}})
-                with a, n
-                merge (a)-[:SOURCE_OF {{ domain: "dassie_browse", trace_id: "{trace_id}" }}]->(n)
+        return self.query(
+            f"""
+                match (a:Article {{trace_id: "{trace_id}"}})-[r:SOURCE_OF]->(b)
+                set b.domain = "dassie_subject"
                 """
-            )
-            logger.debug(f"Neptune query response: {response}")
-            if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-                raise Exception(
-                    f"Neptune query failed with status code: {response['ResponseMetadata']['HTTPStatusCode']}"
-                )
-            return response["results"]
-        except Exception as e:
-            logger.error(f"Error scoping updated graph: {e}")
-            raise e
+        )
 
     @observe()
     def _upsert_article(self, article: Article, trace_id: str):
+        query = self._generate_article_merge_query(article, trace_id)
+        return self.query(query)
+
+    def _generate_article_merge_query(
+        self, article: Article, trace_id: str, idx: int = 0
+    ):
         query = f"""
-        merge (a:Article {{id: "{article.id}"}})
-        on create set a.domain = "dassie_browse", a.title = "{article.title}", a.url = "{article.url}", a.created_at = "{article.created_at}", a.updated_at = "{article.updated_at}", a.trace_id = "{trace_id}"
-        on match set a.domain = "dassie_browse", a.title = "{article.title}", a.url = "{article.url}", a.created_at = "{article.created_at}", a.updated_at = "{article.updated_at}", a.trace_id = a.trace_id + ",{trace_id}"
+        merge (a{idx}:Article {{id: "{article.id}"}})
+        on create set a{idx}.domain = "dassie_browse", a{idx}.title = "{article.title}", a{idx}.url = "{article.url}", a{idx}.created_at = "{article.created_at}", a{idx}.updated_at = "{article.updated_at}", a{idx}.trace_id = "{trace_id}"
+        on match set a{idx}.domain = "dassie_browse", a{idx}.title = "{article.title}", a{idx}.url = "{article.url}", a{idx}.created_at = "{article.created_at}", a{idx}.updated_at = "{article.updated_at}", a{idx}.trace_id = a{idx}.trace_id + ",{trace_id}"
         """
-        try:
-            response = self.client.execute_open_cypher_query(openCypherQuery=query)
-            logger.debug(f"Neptune query response: {response}")
-            if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-                raise Exception(
-                    f"Neptune query failed with status code: {response['ResponseMetadata']['HTTPStatusCode']}"
-                )
-            return response["results"]
-        except Exception as e:
-            logger.error(f"Error upserting article: {e} query: {query}")
-            raise e
+        return query
 
     @observe()
     def _upsert_theme(self, theme: Theme, trace_id: str):
@@ -116,16 +100,60 @@ class NeptuneClient:
         on match set t.domain = "dassie_browse", t.source = "{theme.source}", t.created_at = "{theme.created_at}", t.name = "{theme.original_title}", t.title = "{theme.title}", t.trace_id = t.trace_id + ",{trace_id}"
         """
         for i, article in enumerate(theme.related):
-            query += f'merge (t)-[:RELATED_TO]->(a{i}:Article {{id: "{article.id}"}})\n'
-        try:
-            print(query)
-            response = self.client.execute_open_cypher_query(openCypherQuery=query)
-            logger.debug(f"Neptune query response: {response}")
-            if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
-                raise Exception(
-                    f"Neptune query failed with status code: {response['ResponseMetadata']['HTTPStatusCode']}"
+            query += self._generate_article_merge_query(article, trace_id, i)
+            query += f"merge (t)-[:RELATED_TO]->(a{i})\n"
+        return self.query(query)
+
+    @observe()
+    def _get_duplicate_labels_and_names(self):
+        return self.query(
+            f"""
+            match (a)
+            with a.name as name,labels(a) as labels, count(a) as cbr
+            where cbr >1
+            return name,labels
+            """
+        )
+
+    def _construct_copy_duplicates_relations_query(self, primary_node_id, relations):
+        query = ""
+        for i, rel in enumerate(relations):
+            if rel["a"] in rel["dups"]:
+                query += f"match (a{i}),(b{i}) where id(a{i}) = '{primary_node_id}' and id(b{i}) = '{rel['b']}' merge (a{i})-[:{rel['r']}]->(b{i})\n with a{i},b{i}\n"
+            else:
+                query += f"match (a{i}),(b{i}) where id(a{i}) = '{rel['a']}' and id(b{i}) = '{primary_node_id}' merge (a{i})-[:{rel['r']}]->(b{i})\n with a{i},b{i}\n"
+        return query
+
+    def _construct_delete_duplicate_nodes_query(self, dups):
+        query = f"match (n) where id(n) in {dups} detach delete n"
+        return query
+
+    def _get_duplicates(self, label, name):
+        return self.query(
+            f"""MATCH (n:{label} {{name: "{name}"}})
+            WITH COLLECT(n) AS nodes
+            WITH nodes[0] AS firstNode, TAIL(nodes) AS duplicateNodes
+            UNWIND duplicateNodes as duplicate
+            SET firstNode += duplicate
+            with firstNode,collect(id(duplicate)) as dups
+            match (a)-[r]->(b)
+            where id(b) in dups or id(a) in dups
+            return id(a) as a,type(r) as r,id(b) as b,id(firstNode) as firstNode,dups
+            """
+        )
+
+    @observe()
+    def _merge_duplicate_nodes(self, dups):
+        for dup in dups:
+            res = self._get_duplicates(dup["labels"][0], dup["name"])
+            logger.info(f"Found {len(res)} duplicates for {dup['name']}")
+            if len(res) > 0:
+                query = ""
+                primary_node_id = res[0]["firstNode"]
+                query += self._construct_copy_duplicates_relations_query(
+                    primary_node_id, res
                 )
-            return response["results"]
-        except Exception as e:
-            logger.error(f"Error upserting theme: {e} query: {query}")
-            raise e
+                query += self._construct_delete_duplicate_nodes_query(res[0]["dups"])
+                logger.info(f"Merging duplicates for {dup['name']}: {query}")
+                print(query)
+                self.query(query, rewrite_query=False)

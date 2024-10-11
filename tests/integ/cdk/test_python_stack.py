@@ -140,9 +140,10 @@ def test_build_articles_has_ddb_read_permission(python_dependencies_stack):
         app, "python", python_dependencies_stack=python_dependencies_stack
     )
     template = assertions.Template.from_stack(stack)
+    import json
 
-    # with open("template_output.json", "w") as f:
-    #    json.dump(template.to_json(), f, indent=2)
+    with open("template_output.json", "w") as f:
+        json.dump(template.to_json(), f, indent=2)
 
     template.has_resource_properties(
         "AWS::IAM::Policy",
@@ -195,6 +196,10 @@ def test_build_articles_has_ddb_read_permission(python_dependencies_stack):
                                     "dynamodb:GetItem",
                                     "dynamodb:Scan",
                                     "dynamodb:ConditionCheckItem",
+                                    "dynamodb:BatchWriteItem",
+                                    "dynamodb:PutItem",
+                                    "dynamodb:UpdateItem",
+                                    "dynamodb:DeleteItem",
                                     "dynamodb:DescribeTable",
                                 ],
                                 "Effect": "Allow",

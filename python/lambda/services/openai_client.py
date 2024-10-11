@@ -42,10 +42,10 @@ class OpenAIClient:
     ARTICLE_ENTITIES_PROMPT = """Your task is to identify the entities and relations that are the subject of the following text. 
     Use dbpedia ontologies to model the entities and relations. Output in turtle rdf format."""
     ARTICLE_OPEN_CYPHER_PROMPT = """Your task is to validate that each of the following entities and relations in the turtle are grounded in the text. 
-    Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist."""
+    Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist.Finally add SOURCE_OF relations from (a:Article {{id: \"{article_id}\"}}) to all of the entities"""
     TEMPERATURE = 0
 
-    def __init__(self, api_key, langfuse_key):
+    def __init__(self, api_key, langfuse_key, langfuse_enabled=True):
         self.openai_client = OpenAI(api_key=api_key)
         release = "dev"
         try:
@@ -57,6 +57,7 @@ class OpenAIClient:
             public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
             host="https://cloud.langfuse.com",
             release=release,
+            enabled=langfuse_enabled,
         )
 
     @observe()
@@ -125,7 +126,7 @@ class OpenAIClient:
             self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
         )
         open_cypher = self.get_completion(
-            self.ARTICLE_OPEN_CYPHER_PROMPT,
+            self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
             entities + "\n---\n" + article,
             model=model,
             json_response=False,
