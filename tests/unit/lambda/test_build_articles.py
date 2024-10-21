@@ -28,6 +28,7 @@ def test_build_articles_success(article_service, navlog_service, mock_context):
         "body_text": "This is a test body text that is long enough to be processed. this must be longer than 100 characters",
         "url": "https://example.com",
         "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
+        "id": "123",
     }
     navlog_service.get_content_navlogs.return_value = [navlog]
 

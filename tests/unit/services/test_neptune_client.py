@@ -171,8 +171,11 @@ def test_upsert_article():
 
 
 def test_upsert_theme():
-    client = NeptuneClient("https://test-endpoint:8182", "test", langfuse_enabled=False)
-    client.client = MagicMock()
+    session = MagicMock()
+    client = NeptuneClient(
+        "https://test-endpoint:8182", "test", langfuse_enabled=False, session=session
+    )
+    session.client.return_value = MagicMock()
     client.client.execute_open_cypher_query.return_value = {
         "ResponseMetadata": {"HTTPStatusCode": 200},
         "results": [],
@@ -191,6 +194,6 @@ def test_upsert_theme():
     res = client._upsert_theme(mock_theme, trace_id="456")
     assert client.client.execute_open_cypher_query.call_count == 1
     client.client.execute_open_cypher_query.assert_called_once_with(
-        openCypherQuery='\n        merge (t:Theme {id: "test"})\n        on create set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = "456"\n        on match set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = t.trace_id + ",456"\n        \n        merge (a0:Article {id: "test"})\n        on create set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = "456"\n        on match set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = a0.trace_id + ",456"\n        merge (t)-[:RELATED_TO]->(a0:Article {id: "test"})\n'
+        openCypherQuery='\n        merge (t:Theme {id: "test"})\n        on create set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = "456"\n        on match set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = t.trace_id + ",456"\n        \n        merge (a0:Article {id: "test"})\n        on create set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = "456"\n        on match set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = a0.trace_id + ",456"\n        merge (t)-[:RELATED_TO]->(a0)\n'
     )
     assert res == []

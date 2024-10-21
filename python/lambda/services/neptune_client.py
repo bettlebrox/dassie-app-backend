@@ -12,9 +12,10 @@ from models.theme import Theme
 class NeptuneClient:
     _endpoint = "https://127.0.0.1:8182"
 
-    def __init__(self, endpoint, langfuse_key, langfuse_enabled=True):
+    def __init__(self, endpoint, langfuse_key, langfuse_enabled=True, session=None):
         self._endpoint = endpoint
-        session = boto3.Session()
+        if session is None:
+            session = boto3.Session()
         self.client = session.client("neptunedata", endpoint_url=endpoint, verify=False)
         release = "dev"
         try:
