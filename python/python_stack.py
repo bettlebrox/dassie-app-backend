@@ -456,6 +456,7 @@ class PythonStack(Stack):
             ),
             time_zone=TimeZone.EUROPE_DUBLIN,
             min_capacity=1,
+            max_capacity=3,
         )
         auto_scaling_target.scale_on_schedule(
             "scale-down-in-the-evening",
@@ -468,6 +469,7 @@ class PythonStack(Stack):
             ),
             time_zone=TimeZone.EUROPE_DUBLIN,
             min_capacity=0,
+            max_capacity=0,
         )
         return alias
 
