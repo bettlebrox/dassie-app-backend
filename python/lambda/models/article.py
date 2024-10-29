@@ -213,3 +213,6 @@ class Article(Base):
     @updated_at.setter
     def updated_at(self, value):
         self._updated_at = value
+
+    def __str__(self):
+        return f"Article(id={self._id}, title={self._title}, url={self._url})"

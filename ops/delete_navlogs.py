@@ -25,8 +25,6 @@ def delete_all_items(table_name):
             for item in items:
                 batch.delete_item(Key={"id": item["id"]})
 
-    print("All items have been deleted.")
-
 
 # Usage
 table_name = "TodoAppBackendStack-nwbxl-navlogDB0A59EC5D-CJ3HCDHHL44L"

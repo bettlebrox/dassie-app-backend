@@ -32,3 +32,4 @@ local.env
 data/get_article_summarization.csv
 data/.ipynb_checkpoints/get_article_summarization-checkpoint.csv
 template_output.json
+python/lambda/services/opencypher_translate_optimised.json

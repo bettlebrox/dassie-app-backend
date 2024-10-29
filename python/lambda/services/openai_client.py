@@ -6,6 +6,8 @@ from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
 from langfuse.openai import OpenAI
 from dassie_logger import logger
+from services.opencypher_translator import translator
+from openai import LegacyAPIResponse
 
 
 class LLMResponseException(Exception):
@@ -125,13 +127,14 @@ class OpenAIClient:
         entities = self.get_completion(
             self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
         )
-        open_cypher = self.get_completion(
-            self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
-            entities + "\n---\n" + article,
-            model=model,
-            json_response=False,
-        )
-        return self._get_opencypher_code_block(open_cypher)
+        # open_cypher = self.get_completion(
+        #    self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
+        #    entities + "\n---\n" + article,
+        #    model=model,
+        #    json_response=False,
+        # )
+        pred = translator(question=entities + "\n---\n" + article)
+        return self._get_opencypher_code_block(pred.response)
 
     def _get_opencypher_code_block(self, open_cypher):
         start_opencypher_code_block = -1

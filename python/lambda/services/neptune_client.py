@@ -1,8 +1,6 @@
 import os
 import boto3
 import re
-from langfuse.decorators import langfuse_context
-from langfuse.decorators import observe
 
 from dassie_logger import logger
 from models.article import Article
@@ -22,15 +20,7 @@ class NeptuneClient:
             release = os.environ["DD_TAGS"]
         except KeyError:
             pass
-        langfuse_context.configure(
-            secret_key=langfuse_key,
-            public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
-            host="https://cloud.langfuse.com",
-            release=release,
-            enabled=langfuse_enabled,
-        )
 
-    @observe()
     def query(
         self,
         query,
@@ -39,19 +29,18 @@ class NeptuneClient:
         try:
             if rewrite_query:
                 query = self._remove_unsupported_from_query(query)
-            logger.info(f"Neptune query: {query}")
+            logger.debug(f"""Neptune query: {query}""")
             response = self.client.execute_open_cypher_query(openCypherQuery=query)
-            logger.info(f"Neptune query response: {response}")
+            logger.debug(f"""Neptune query response: {response}""")
             if response["ResponseMetadata"]["HTTPStatusCode"] != 200:
                 raise Exception(
                     f"Neptune query failed with status code: {response['ResponseMetadata']['HTTPStatusCode']}"
                 )
             return response["results"]
         except Exception as e:
-            logger.error(f"Error querying Neptune: {e}")
+            logger.error(f"Error querying Neptune: {e}", extra={"query": query})
             raise e
 
-    @observe()
     def _remove_unsupported_from_query(self, query):
         query = re.sub(r"(date|datetime|duration)\((('|\").*?('|\"))\)", r"\2", query)
         query = re.sub(
@@ -63,14 +52,31 @@ class NeptuneClient:
         )
         return query
 
-    @observe()
     def upsert_article_graph(self, article: Article, subject_graph: str, trace_id: str):
         self._upsert_article(article, trace_id)
         self.query(subject_graph)
+        dups = self._get_duplicate_labels_and_names()
+        self._merge_duplicate_nodes(dups)
         self._scope_updated_graph(article.id, trace_id)
 
-    @observe()
+    def _get_unscoped_graph(self, article_id: str, trace_id: str):
+        logger.debug(
+            "_get_unscoped_graph",
+            extra={"article_id": article_id, "trace_id": trace_id},
+        )
+        return self.query(
+            f"""
+                match (a:Article {{id: "{article_id}", trace_id: "{trace_id}"}})-[r:SOURCE_OF]->(b)
+                where not exists(a.domain)
+                return b.name,labels(b)
+                """
+        )
+
     def _scope_updated_graph(self, article_id: str, trace_id: str):
+        logger.debug(
+            "_scope_updated_graph",
+            extra={"article_id": article_id, "trace_id": trace_id},
+        )
         return self.query(
             f"""
                 match (a:Article {{trace_id: "{trace_id}"}})-[r:SOURCE_OF]->(b)
@@ -78,7 +84,6 @@ class NeptuneClient:
                 """
         )
 
-    @observe()
     def _upsert_article(self, article: Article, trace_id: str):
         query = self._generate_article_merge_query(article, trace_id)
         return self.query(query)
@@ -93,7 +98,6 @@ class NeptuneClient:
         """
         return query
 
-    @observe()
     def _upsert_theme(self, theme: Theme, trace_id: str):
         query = f"""
         merge (t:Theme {{id: "{theme.id}"}})
@@ -105,10 +109,18 @@ class NeptuneClient:
             query += f"merge (t)-[:RELATED_TO]->(a{i})\n"
         return self.query(query)
 
-    @observe()
     def _get_duplicate_labels_and_names(self):
+        logger.debug("_get_duplicate_labels_and_names")
         return self.query(
             f"""
+            match (n)
+            where not exists(n.name) and exists(n.label)
+            set n.name = n.label
+            with count(*) as dummy
+            match (m)
+where not exists(m.name) and not exists(m.label)
+            set m.name = m.id
+            with count(*) as dummy
             match (a)
             with a.name as name,labels(a) as labels, count(a) as cbr
             where cbr >1
@@ -117,21 +129,30 @@ class NeptuneClient:
         )
 
     def _construct_copy_duplicates_relations_query(self, primary_node_id, relations):
+        logger.debug(
+            "_construct_copy_duplicates_relations_query",
+            extra={"primary_node_id": primary_node_id, "relations": relations},
+        )
         query = ""
         for i, rel in enumerate(relations):
+            relName = rel["r"].replace(":", "").replace("-", "")
             if rel["a"] in rel["dups"]:
-                query += f"match (a{i}),(b{i}) where id(a{i}) = '{primary_node_id}' and id(b{i}) = '{rel['b']}' merge (a{i})-[:{rel['r']}]->(b{i})\n with a{i},b{i}\n"
+                query += f"match (a{i}),(b{i}) where id(a{i}) = '{primary_node_id}' and id(b{i}) = '{rel['b']}' merge (a{i})-[:{relName}]->(b{i})\n with a{i},b{i}\n"
             else:
-                query += f"match (a{i}),(b{i}) where id(a{i}) = '{rel['a']}' and id(b{i}) = '{primary_node_id}' merge (a{i})-[:{rel['r']}]->(b{i})\n with a{i},b{i}\n"
+                query += f"match (a{i}),(b{i}) where id(a{i}) = '{rel['a']}' and id(b{i}) = '{primary_node_id}' merge (a{i})-[:{relName}]->(b{i})\n with a{i},b{i}\n"
         return query
 
     def _construct_delete_duplicate_nodes_query(self, dups):
+        logger.debug("_construct_delete_duplicate_nodes_query", extra={"dups": dups})
         query = f"match (n) where id(n) in {dups} detach delete n"
         return query
 
-    def _get_duplicates(self, label, name):
-        return self.query(
-            f"""MATCH (n:{label} {{name: "{name}"}})
+    def _get_duplicates(self, label, node_name):
+        logger.debug("_get_duplicates", extra={"label": label, "node_name": node_name})
+        match_query = f"""MATCH (n:{label} {{name: "{node_name}"}})"""
+        if node_name is None:
+            match_query = f"""MATCH (n:{label}) where not exists(n.name)"""
+        query = f"""
             WITH COLLECT(n) AS nodes
             WITH nodes[0] AS firstNode, TAIL(nodes) AS duplicateNodes
             UNWIND duplicateNodes as duplicate
@@ -141,13 +162,13 @@ class NeptuneClient:
             where id(b) in dups or id(a) in dups
             return id(a) as a,type(r) as r,id(b) as b,id(firstNode) as firstNode,dups
             """
-        )
+        return self.query(match_query + query)
 
-    @observe()
     def _merge_duplicate_nodes(self, dups):
+        logger.debug("_merge_duplicate_nodes", extra={"dups": dups})
         for dup in dups:
             res = self._get_duplicates(dup["labels"][0], dup["name"])
-            logger.info(f"Found {len(res)} duplicates for {dup['name']}")
+            logger.debug(f"Found {len(res)} duplicates for {dup['name']}")
             if len(res) > 0:
                 query = ""
                 primary_node_id = res[0]["firstNode"]
@@ -155,6 +176,5 @@ class NeptuneClient:
                     primary_node_id, res
                 )
                 query += self._construct_delete_duplicate_nodes_query(res[0]["dups"])
-                logger.info(f"Merging duplicates for {dup['name']}: {query}")
-                print(query)
+                logger.debug(f"Merging duplicates for {dup['name']}: {query}")
                 self.query(query, rewrite_query=False)
