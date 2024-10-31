@@ -32,6 +32,12 @@ class NeptuneClient:
         )
 
     @observe()
+    def execute(self, query: str, rewrite_query: bool = True):
+        """Executes a query with langfuse observability tracking.
+        This decorator adds langfuse tracing to track query execution performance and metadata.
+        """
+        return self.query(query, rewrite_query)
+
     def query(
         self,
         query: str,
@@ -65,7 +71,7 @@ class NeptuneClient:
 
     def upsert_article_graph(self, article: Article, subject_graph: str, trace_id: str):
         self._upsert_article(article, trace_id)
-        self.query(subject_graph)
+        self.execute(subject_graph)
         dups = self._get_duplicate_labels_and_names()
         self._merge_duplicate_nodes(dups)
         self._scope_updated_graph(article.id, trace_id)
@@ -97,7 +103,7 @@ class NeptuneClient:
 
     def _upsert_article(self, article: Article, trace_id: str):
         query = self._generate_article_merge_query(article, trace_id)
-        return self.query(query)
+        return self.execute(query)
 
     def _generate_article_merge_query(
         self, article: Article, trace_id: str, idx: int = 0
@@ -118,7 +124,7 @@ class NeptuneClient:
         for i, article in enumerate(theme.related):
             query += self._generate_article_merge_query(article, trace_id, i)
             query += f"merge (t)-[:RELATED_TO]->(a{i})\n"
-        return self.query(query)
+        return self.execute(query)
 
     def _get_duplicate_labels_and_names(self):
         logger.debug("_get_duplicate_labels_and_names")
@@ -188,4 +194,10 @@ where not exists(m.name) and not exists(m.label)
                 )
                 query += self._construct_delete_duplicate_nodes_query(res[0]["dups"])
                 logger.debug(f"Merging duplicates for {dup['name']}: {query}")
-                self.query(query, rewrite_query=False)
+                self.execute(query, rewrite_query=False)
+
+    def get_theme_graph(self, theme_title: str):
+        return self.query(
+            f"""match (t:Theme {{title:"{theme_title}"}})-[r:RELATED_TO]->(a:Article)-[q:SOURCE_OF]-(b)-[s]-(c)
+return a,q,b,s,c"""
+        )
