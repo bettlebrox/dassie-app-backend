@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Literal
 from openai import NOT_GIVEN
 import tiktoken
 from langfuse.decorators import langfuse_context
@@ -7,7 +8,6 @@ from langfuse.decorators import observe
 from langfuse.openai import OpenAI
 from dassie_logger import logger
 from services.opencypher_translator import translator
-from openai import LegacyAPIResponse
 
 
 class LLMResponseException(Exception):
@@ -121,6 +121,9 @@ class OpenAIClient:
 
     @observe()
     def get_article_graph(self, article, article_id, model="gpt-4o-mini"):
+        langfuse_context.update_current_trace(
+            input={"article_id": article_id},
+        )
         if len(article) < self.MIN_TEXT_LENGTH:
             logger.info(f"article too short: {article_id}")
             return None
@@ -133,23 +136,26 @@ class OpenAIClient:
         #    model=model,
         #    json_response=False,
         # )
-        pred = translator(question=entities + "\n---\n" + article)
-        return self._get_opencypher_code_block(pred.response)
+        response = self.translate_to_opencypher(entities, article, article_id)
+        return self._get_opencypher_code_block(response)
+
+    @observe(as_type=Literal["generation"])
+    def translate_to_opencypher(self, entities, article, article_id):
+        return translator(
+            question=entities + "\n---\n" + article, article_id=article_id
+        ).response
 
     def _get_opencypher_code_block(self, open_cypher):
-        start_opencypher_code_block = -1
-        end_opencypher_code_block = len(open_cypher)
-        opencypher_start = open_cypher.find("```opencypher")
-        if opencypher_start == -1:
-            cypher_start = open_cypher.find("```cypher")
-        if opencypher_start != -1:
-            start_opencypher_code_block = opencypher_start + len("```opencypher")
-        elif cypher_start != -1:
-            start_opencypher_code_block = cypher_start + len("```cypher")
-        opencypher_end = open_cypher.rfind("```")
-        if opencypher_end != -1 and opencypher_end > start_opencypher_code_block:
-            end_opencypher_code_block = opencypher_end
-        return open_cypher[start_opencypher_code_block:end_opencypher_code_block]
+        code_block = open_cypher.strip()
+        for delimiter in [
+            "```opencypher",
+            "```cypher",
+            "```",
+        ]:
+            if delimiter in code_block:
+                code_block = code_block.split(delimiter, 1)[-1]
+                break
+        return code_block.strip("`").strip()
 
     @observe()
     def get_article_summarization(self, article, model=MODEL):

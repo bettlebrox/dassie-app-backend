@@ -1,10 +1,13 @@
 import os
+from typing import Literal
 import boto3
 import re
 
 from dassie_logger import logger
 from models.article import Article
 from models.theme import Theme
+from langfuse.decorators import langfuse_context
+from langfuse.decorators import observe
 
 
 class NeptuneClient:
@@ -20,11 +23,19 @@ class NeptuneClient:
             release = os.environ["DD_TAGS"]
         except KeyError:
             pass
+        langfuse_context.configure(
+            secret_key=langfuse_key,
+            public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
+            host="https://cloud.langfuse.com",
+            release=release,
+            enabled=langfuse_enabled,
+        )
 
+    @observe()
     def query(
         self,
-        query,
-        rewrite_query=True,
+        query: str,
+        rewrite_query: bool = True,
     ):
         try:
             if rewrite_query:
