@@ -40,11 +40,96 @@ class PythonStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
         self.python_dependencies_stack = python_dependencies_stack
 
-        # Create the VPC with the NAT provider
+        # Create the VPC with both public and private subnets
         self.vpc = ec2.Vpc(
             self,
             "AuroraVpc1",
+            max_azs=2,  # Maximum Availability Zones
+            nat_gateways=0,  # Disable NAT gateways
+            subnet_configuration=[
+                ec2.SubnetConfiguration(
+                    name="Public",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                    cidr_mask=18,
+                ),
+                ec2.SubnetConfiguration(
+                    name="Private",
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=18,
+                ),
+            ],
         )
+
+        # Create a VPC endpoint for S3
+        s3_endpoint = ec2.GatewayVpcEndpoint(
+            self,
+            "S3VpcEndpoint",
+            vpc=self.vpc,
+            service=ec2.GatewayVpcEndpointAwsService.S3,
+        )
+        dynamodb_endpoint = ec2.GatewayVpcEndpoint(
+            self,
+            "DynamoDBVpcEndpoint",
+            vpc=self.vpc,
+            service=ec2.GatewayVpcEndpointAwsService.DYNAMODB,
+        )
+
+        # Create a NAT instance using Amazon Linux 2
+        nat_instance = ec2.Instance(
+            self,
+            "NatInstance",
+            instance_type=ec2.InstanceType(
+                "t3.micro"
+            ),  # Choose an appropriate instance type
+            machine_image=ec2.MachineImage.latest_amazon_linux2(),  # Use Amazon Linux 2 AMI
+            source_dest_check=False,
+            vpc=self.vpc,
+            vpc_subnets={
+                "subnet_type": ec2.SubnetType.PUBLIC
+            },  # Place in a public subnet
+            key_name="nat_instances",  # Specify your key pair for SSH access
+            user_data=ec2.UserData.custom(
+                """#!/bin/bash
+                # Update the system
+                yum update -y
+
+                # Enable IP forwarding
+                echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
+                sysctl -p
+
+                # Install iptables if not already installed
+                yum install -y iptables
+
+                # Set up iptables rules for NAT
+                iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+                iptables -F FORWARD
+                # Save iptables rules to persist across reboots
+                service iptables save
+
+                # Optionally, restart the iptables service
+                service iptables restart
+                """
+            ),
+        )
+
+        # Allow the NAT instance to access the internet
+        nat_instance.add_security_group(
+            ec2.SecurityGroup(
+                self,
+                "NatInstanceSG",
+                vpc=self.vpc,
+                allow_all_outbound=True,
+            )
+        )
+
+        # Update route tables to use the NAT instance
+        for subnet in self.vpc.private_subnets:
+            subnet.add_route(
+                "NatRoute",
+                router_id=nat_instance.instance_id,
+                router_type=ec2.RouterType.INSTANCE,
+                destination_cidr_block="0.0.0.0/0",
+            )
 
         self.bastion = ec2.SecurityGroup.from_security_group_id(
             self,
@@ -73,7 +158,6 @@ class PythonStack(Stack):
             "layers": self.reqs_layers,
             "architecture": lambda_.Architecture.ARM_64,
             "memory_size": 1024,
-            "security_groups": self.sql_db.connections.security_groups,
             "environment": self.lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,
             "timeout": Duration.seconds(45),
@@ -397,7 +481,9 @@ class PythonStack(Stack):
         }
         return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
 
-    def modify_security_group_for_lambda_access(self, functions, sql_db):
+    def modify_security_group_for_lambda_access(
+        self, functions, sql_db: rds.DatabaseCluster
+    ):
         # Modify the security group of the Aurora Serverless cluster to allow inbound connections from the Lambda function
         for security_group in sql_db.connections.security_groups:
             for function in functions:
