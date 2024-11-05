@@ -531,19 +531,19 @@ class PythonStack(Stack):
         alias = lambda_function.add_alias("provisioned")
         auto_scaling_target = alias.add_auto_scaling(min_capacity=1, max_capacity=3)
         auto_scaling_target.scale_on_utilization(utilization_target=0.5)
-        auto_scaling_target.scale_on_schedule(
-            "scale-up-in-the-morning",
-            schedule=appscaling.Schedule.cron(
-                minute="0",
-                hour="8",
-                day="*",
-                month="*",
-                year="*",
-            ),
-            time_zone=TimeZone.EUROPE_DUBLIN,
-            min_capacity=1,
-            max_capacity=3,
-        )
+        # auto_scaling_target.scale_on_schedule(
+        #     "scale-up-in-the-morning",
+        #     schedule=appscaling.Schedule.cron(
+        #         minute="0",
+        #         hour="8",
+        #         day="*",
+        #         month="*",
+        #         year="*",
+        #     ),
+        #     time_zone=TimeZone.EUROPE_DUBLIN,
+        #     min_capacity=1,
+        #     max_capacity=3,
+        # )
         auto_scaling_target.scale_on_schedule(
             "scale-down-in-the-evening",
             schedule=appscaling.Schedule.cron(

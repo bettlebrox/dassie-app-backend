@@ -25,11 +25,17 @@ class PythonDependenciesStack(Stack):
         )
         reqs_layer_2 = lambda_python.PythonLayerVersion(
             self,
-            "RequirementsLayerExtended2",
+            "RequirementsLayer2",
             entry="python/layer2",
             compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
+            description="Requirements layer for layer2 with optimized bundling",
+            bundling=lambda_python.BundlingOptions(
+                asset_excludes=["*.pyc", "*.pyo", "tests/*", "docs/*"],
+                environment={
+                    "PYTHONUNBUFFERED": "1",
+                },
+            ),
         )
         self.layer_arn = CfnOutput(
             self,
