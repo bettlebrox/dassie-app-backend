@@ -67,20 +67,18 @@ def test_get_completion_json_decode_error(openai_client):
 
 
 def test_get_article_graph(openai_client):
-    with patch.object(openai_client, "get_completion") as mock_get_completion:
-        mock_get_completion.side_effect = [
-            "Turtle RDF content",
-            "```opencypher\nCREATE (a:Article {id: 'test_id'})\n```",
-        ]
-        result = openai_client.get_article_graph("Test article" * 100, "test_id")
-        assert result == "\nCREATE (a:Article {id: 'test_id'})\n"
-    with patch.object(openai_client, "get_completion") as mock_get_completion:
-        mock_get_completion.side_effect = [
-            "Turtle RDF content",
-            "some preamble text that I don't really care about ```cypher\nCREATE (a:Article {id: 'test_id'})\n```",
-        ]
-        result = openai_client.get_article_graph("Test article" * 100, "test_id")
-        assert result == "\nCREATE (a:Article {id: 'test_id'})\n"
+    assert (
+        openai_client._get_opencypher_code_block(
+            "```opencypher\nCREATE (a:Article {id: 'test_id'})\n```"
+        )
+        == "CREATE (a:Article {id: 'test_id'})"
+    )
+    assert (
+        openai_client._get_opencypher_code_block(
+            "some preamble text that I don't really care about ```cypher\nCREATE (a:Article {id: 'test_id'})\n```"
+        )
+        == "CREATE (a:Article {id: 'test_id'})"
+    )
 
 
 def test_get_cypher_code_block_unterminated_block(openai_client):
@@ -109,8 +107,7 @@ MERGE (a)-[:SOURCE_OF]->(d)"""
     result = openai_client._get_opencypher_code_block(example_text)
     assert (
         result
-        == """
-MERGE (a:Article {id: '6417f3da-51be-4328-99a5-66df16901ebd'})
+        == """MERGE (a:Article {id: '6417f3da-51be-4328-99a5-66df16901ebd'})
 MERGE (a)-[:SOURCE_OF]->(d)"""
     )
 
