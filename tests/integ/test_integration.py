@@ -14,7 +14,7 @@ import pytest
 test_id = ""
 random_title = ""
 LOCAL_API = "http://127.0.0.1:3000/api"
-PRD_API = "https://p5cgnlejzk.execute-api.eu-west-1.amazonaws.com/prod"
+PRD_API = "https://2eh5dqfti6.execute-api.eu-west-1.amazonaws.com/prod/"
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
@@ -185,7 +185,7 @@ def test_add_navlog(apiEndpoint: str):
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def get_api_endpoint(resourcename="navlogs"):
-    apiEndpoint = LOCAL_API  # PRD_API  # LOCAL_API
+    apiEndpoint = PRD_API  # LOCAL_API
     if apiEndpoint.startswith("http://127.0.0.1"):
         warnings.warn(
             "Using local API endpoint for testing. Ensure sam local start-api is running before running tests."

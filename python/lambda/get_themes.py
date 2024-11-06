@@ -47,7 +47,7 @@ def lambda_handler(event, context, theme_repo=None, openai_client=None, useGloba
             else [ThemeType.TOP]
         )
         result = []
-        max = int(params["max"]) if "max" in params else "max"
+        max = int(params["max"]) if "max" in params else 10
         title = event["path"].split("/")[-1]
         response["body"] = None
         if title != "themes":

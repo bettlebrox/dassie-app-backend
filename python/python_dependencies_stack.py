@@ -7,7 +7,7 @@ import aws_cdk.aws_lambda_python_alpha as lambda_python
 class PythonDependenciesStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        reqs_layer = lambda_python.PythonLayerVersion(
+        self.reqs_layer = lambda_python.PythonLayerVersion(
             self,
             "RequirementsLayer",
             entry="python/layer",
@@ -15,45 +15,33 @@ class PythonDependenciesStack(Stack):
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Requirements layer",
         )
-        reqs_layer_1 = lambda_python.PythonLayerVersion(
+        self.ai_layer = lambda_python.PythonLayerVersion(
             self,
-            "RequirementsLayerExtended",
-            entry="python/layer1",
+            "AILayer",
+            entry="python/layer_ai",
             compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
             description="Another requirements layer - in order to split deps across zip file limits",
         )
-        reqs_layer_2 = lambda_python.PythonLayerVersion(
+        self.more_ai_layer = lambda_python.PythonLayerVersion(
             self,
-            "RequirementsLayer2",
-            entry="python/layer2",
+            "MoreAILayer",
+            entry="python/layer_more_ai",
             compatible_architectures=[lambda_.Architecture.ARM_64],
             compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer for layer2 with optimized bundling",
+            description="Requirements layer for layer2 - more ai",
             bundling=lambda_python.BundlingOptions(
-                asset_excludes=["*.pyc", "*.pyo", "tests/*", "docs/*"],
+                asset_excludes=[
+                    "*.pyc",
+                    "*.pyo",
+                    "tests/*",
+                    "docs/*",
+                    "pyarrow/*",
+                    "pandas/*",
+                    "openai/*",
+                ],
                 environment={
                     "PYTHONUNBUFFERED": "1",
                 },
             ),
         )
-        self.layer_arn = CfnOutput(
-            self,
-            "PythonLayerStackARN",
-            value=reqs_layer.layer_version_arn,
-            export_name="PythonLayerStackARN",
-        ).export_name
-
-        self.layer_arn_1 = CfnOutput(
-            self,
-            "PythonLayerStackARN1",
-            value=reqs_layer_1.layer_version_arn,
-            export_name="PythonLayerStackARN1",
-        ).export_name
-
-        self.layer_arn_2 = CfnOutput(
-            self,
-            "PythonLayerStackARN2",
-            value=reqs_layer_2.layer_version_arn,
-            export_name="PythonLayerStackARN2",
-        ).export_name

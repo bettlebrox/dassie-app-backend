@@ -17,6 +17,7 @@ import aws_cdk.aws_iam as iam
 import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
+from infra_stack import InfraStack
 from python_dependencies_stack import PythonDependenciesStack
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
@@ -35,109 +36,16 @@ class PythonStack(Stack):
         scope: Construct,
         construct_id: str,
         python_dependencies_stack: PythonDependenciesStack,
+        infra_stack: InfraStack,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
         self.python_dependencies_stack = python_dependencies_stack
-
-        # Create the VPC with both public and private subnets
-        self.vpc = ec2.Vpc(
-            self,
-            "AuroraVpc1",
-            max_azs=2,  # Maximum Availability Zones
-            nat_gateways=0,  # Disable NAT gateways
-            subnet_configuration=[
-                ec2.SubnetConfiguration(
-                    name="Public",
-                    subnet_type=ec2.SubnetType.PUBLIC,
-                    cidr_mask=18,
-                ),
-                ec2.SubnetConfiguration(
-                    name="Private",
-                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
-                    cidr_mask=18,
-                ),
-            ],
-        )
-
-        # Create a VPC endpoint for S3
-        s3_endpoint = ec2.GatewayVpcEndpoint(
-            self,
-            "S3VpcEndpoint",
-            vpc=self.vpc,
-            service=ec2.GatewayVpcEndpointAwsService.S3,
-        )
-        dynamodb_endpoint = ec2.GatewayVpcEndpoint(
-            self,
-            "DynamoDBVpcEndpoint",
-            vpc=self.vpc,
-            service=ec2.GatewayVpcEndpointAwsService.DYNAMODB,
-        )
-
-        # Create a NAT instance using Amazon Linux 2
-        nat_instance = ec2.Instance(
-            self,
-            "NatInstance",
-            instance_type=ec2.InstanceType(
-                "t3.micro"
-            ),  # Choose an appropriate instance type
-            machine_image=ec2.MachineImage.latest_amazon_linux2(),  # Use Amazon Linux 2 AMI
-            source_dest_check=False,
-            vpc=self.vpc,
-            vpc_subnets={
-                "subnet_type": ec2.SubnetType.PUBLIC
-            },  # Place in a public subnet
-            key_name="nat_instances",  # Specify your key pair for SSH access
-            user_data=ec2.UserData.custom(
-                """#!/bin/bash
-                # Update the system
-                yum update -y
-
-                # Enable IP forwarding
-                echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
-                sysctl -p
-
-                # Install iptables if not already installed
-                yum install -y iptables
-
-                # Set up iptables rules for NAT
-                iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-                iptables -F FORWARD
-                # Save iptables rules to persist across reboots
-                service iptables save
-
-                # Optionally, restart the iptables service
-                service iptables restart
-                """
-            ),
-        )
-
-        # Allow the NAT instance to access the internet
-        nat_instance.add_security_group(
-            ec2.SecurityGroup(
-                self,
-                "NatInstanceSG",
-                vpc=self.vpc,
-                allow_all_outbound=True,
-            )
-        )
-
-        # Update route tables to use the NAT instance
-        for subnet in self.vpc.private_subnets:
-            subnet.add_route(
-                "NatRoute",
-                router_id=nat_instance.instance_id,
-                router_type=ec2.RouterType.INSTANCE,
-                destination_cidr_block="0.0.0.0/0",
-            )
-
-        self.bastion = ec2.SecurityGroup.from_security_group_id(
-            self,
-            "bastion",
-            security_group_id="sg-0669c97cc65247ecd",
-        )
-        self.sql_db = self.create_postgres_database(self.vpc, self.bastion)
-        self.ddb = self.create_ddb_table()
+        self.sql_db = infra_stack.sql_db
+        self.ddb = infra_stack.ddb
+        self.vpc = infra_stack.vpc
+        self.bastion_sg = infra_stack.bastion_sg
+        self.lambda_db_access_sg = infra_stack.lambda_db_access_sg
         self.openai_secret, self.langfuse_secret = self.create_secrets()
         (
             self.bucket,
@@ -147,7 +55,9 @@ class PythonStack(Stack):
             self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
         )
         self.archive_bucket, self.archive_navlog = (
-            self.create_archive_related_resources(self.reqs_layers[2], self.ddb)
+            self.create_archive_related_resources(
+                self.reqs_layers["reqs_layer"], self.ddb
+            )
         )
         lambda_function_props = {
             "runtime": lambda_.Runtime.PYTHON_3_9,
@@ -155,14 +65,15 @@ class PythonStack(Stack):
                 path.join(os.getcwd(), "python/lambda")
             ),
             "vpc": self.vpc,
-            "layers": self.reqs_layers,
+            "security_groups": [self.lambda_db_access_sg],
+            "layers": list(self.reqs_layers.values()),
             "architecture": lambda_.Architecture.ARM_64,
             "memory_size": 1024,
             "environment": self.lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,
             "timeout": Duration.seconds(45),
         }
-
+        self.aliases = {}
         self.functions = {
             "build_articles": self.create_lambda_function(
                 "build_articles",
@@ -228,16 +139,20 @@ class PythonStack(Stack):
                 lambda_function_props,
             ),
             "add_navlog": self.create_add_navlog_function(
-                self.lambdas_env, self.ddb, self.bucket, self.vpc, self.reqs_layers[2]
+                self.lambdas_env,
+                self.ddb,
+                self.bucket,
+                self.vpc,
+                self.reqs_layers["reqs_layer"],
             ),
         }
-        self.ddb.grant_read_write_data(self.functions["build_articles"])
+        # self.ddb.grant_read_write_data(self.functions["build_articles"])
         functions_to_dd_instrument = list(self.functions.values())
         functions_to_dd_instrument.append(self.archive_navlog)
         self.instrument_with_datadog(functions_to_dd_instrument)
-        self.modify_security_group_for_lambda_access(
-            list(self.functions.values()), self.sql_db
-        )
+        # self.modify_security_group_for_lambda_access(
+        #     list(self.functions.values()), self.sql_db
+        # )
 
         self.create_scheduled_event_for_function(
             "build_articles", self.functions["build_articles"], "27"
@@ -281,17 +196,19 @@ class PythonStack(Stack):
         )
 
         if construct_id != "LocalStack":
-            self.functions["get_themes"] = self.create_auto_scaling_for_lambda(
+            self.aliases["get_themes"] = self.create_auto_scaling_for_lambda(
                 self.functions["get_themes"]
             )
-            self.functions["search"] = self.create_auto_scaling_for_lambda(
+            self.aliases["search"] = self.create_auto_scaling_for_lambda(
                 self.functions["search"]
             )
-            self.functions["add_theme"] = self.create_auto_scaling_for_lambda(
+            self.aliases["add_theme"] = self.create_auto_scaling_for_lambda(
                 self.functions["add_theme"]
             )
 
-        self.apiGateway = self.create_api_gateway_resources(self.functions)
+        self.apiGateway = self.create_api_gateway_resources(
+            self.functions, self.aliases
+        )
 
         CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
 
@@ -333,28 +250,33 @@ class PythonStack(Stack):
         openai_secret.grant_read(lambda_function)
         langfuse_secret.grant_read(lambda_function)
 
-    def create_postgres_database(self, vpc, bastion):
-        sql_db = rds.DatabaseCluster(
-            self,
-            "dassie1",
-            engine=rds.DatabaseClusterEngine.aurora_postgres(
+    def create_postgres_database(self, vpc, bastion, snapshot_id=None):
+        common_params = {
+            "engine": rds.DatabaseClusterEngine.aurora_postgres(
                 version=rds.AuroraPostgresEngineVersion.VER_16_1
             ),
-            serverless_v2_max_capacity=16,
-            serverless_v2_min_capacity=0.5,
-            vpc=vpc,
-            writer=rds.ClusterInstance.serverless_v2(
+            "serverless_v2_max_capacity": 16,
+            "serverless_v2_min_capacity": 0.5,
+            "vpc": vpc,
+            "writer": rds.ClusterInstance.serverless_v2(
                 "writer", enable_performance_insights=True
             ),
-            storage_encrypted=True,
-            monitoring_interval=Duration.seconds(60),
-            monitoring_role=iam.Role.from_role_arn(
+            "storage_encrypted": True,
+            "monitoring_interval": Duration.seconds(60),
+            "monitoring_role": iam.Role.from_role_arn(
                 self,
                 "monitoring-role",
                 "arn:aws:iam::559845934392:role/emaccess",
             ),
-            cloudwatch_logs_exports=["postgresql"],
-        )
+            "cloudwatch_logs_exports": ["postgresql"],
+        }
+
+        if snapshot_id is not None:
+            sql_db = rds.DatabaseClusterFromSnapshot(
+                self, "dassie1", snapshot_identifier=snapshot_id, **common_params
+            )
+        else:
+            sql_db = rds.DatabaseCluster(self, "dassie1", **common_params)
         sql_db.connections.allow_default_port_from(bastion)
         return sql_db
 
@@ -450,21 +372,9 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
-        postgres_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
-            self,
-            "RequirementsLayer",
-            layer_version_arn=self.python_dependencies_stack.layer_arn,
-        )
-        ai_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
-            self,
-            "RequirementsLayerExtended",
-            layer_version_arn=self.python_dependencies_stack.layer_arn_1,
-        )
-        utils_layer = lambda_python.PythonLayerVersion.from_layer_version_arn(
-            self,
-            "RequirementsLayerExtended1",
-            layer_version_arn=self.python_dependencies_stack.layer_arn_2,
-        )
+        reqs_layer = self.python_dependencies_stack.reqs_layer
+        ai_layer = self.python_dependencies_stack.ai_layer
+        more_ai_layer = self.python_dependencies_stack.more_ai_layer
         lambdas_env = {
             "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
@@ -479,7 +389,15 @@ class PythonStack(Stack):
             "DD_SERVICE": "dassie-app-backend",
             "DD_VERSION": "1.0.0",
         }
-        return bucket, [postgres_layer, ai_layer, utils_layer], lambdas_env
+        return (
+            bucket,
+            {
+                "reqs_layer": reqs_layer,
+                "ai_layer": ai_layer,
+                "more_ai_layer": more_ai_layer,
+            },
+            lambdas_env,
+        )
 
     def modify_security_group_for_lambda_access(
         self, functions, sql_db: rds.DatabaseCluster
@@ -522,9 +440,9 @@ class PythonStack(Stack):
             handler=f"{function_name.lower()}.lambda_handler",
             **lambda_function_props,
         )
-        self.grant_lambda_permissions(
-            lambda_function, sql_db, openai_secret, langfuse_secret
-        )
+        # self.grant_lambda_permissions(
+        #     lambda_function, sql_db, openai_secret, langfuse_secret
+        # )
         return lambda_function
 
     def create_auto_scaling_for_lambda(self, lambda_function: lambda_.Function):
@@ -563,36 +481,48 @@ class PythonStack(Stack):
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
         api_role = iam.Role.from_role_arn(
             self,
-            "google_cognito",
-            role_arn="arn:aws:sts::559845934392:assumed-role/google_cognito",
+            "frontend_role",
+            role_arn="arn:aws:iam::559845934392:role/amplify-d1tgde1goqkt1z-ma-amplifyAuthauthenticatedU-y3rmjhCgkLMl",
         )
         policy = iam.PolicyStatement(
             sid="allow_google_cognito",
             effect=iam.Effect.ALLOW,
             actions=["execute-api:Invoke"],
             resources=[
-                f"arn:aws:execute-api:eu-west-1:559845934392:p5cgnlejzk/prod/*/*/*"
+                f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*"
             ],
             conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
             principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
         )
-        cors = apigateway.CorsOptions(
-            allow_credentials=True,
-            allow_origins=[
-                "http://localhost:5174",
-                "https://main.d1tgde1goqkt1z.amplifyapp.com",
-            ],
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-        return log_group, policy, cors
 
-    def create_api_gateway_resources(self, functions):
-        log_group, policy, cors = self.create_api_gateway_dependencies()
+        unauthenticated_policy = iam.PolicyStatement(
+            sid="allow_unauthenticated_options",
+            effect=iam.Effect.ALLOW,
+            actions=["execute-api:Invoke"],
+            resources=[
+                f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*"
+            ],
+            principals=[iam.AnyPrincipal()],
+        )
+        cors = apigateway.CorsOptions(
+            allow_origins=apigateway.Cors.ALL_ORIGINS,
+            allow_methods=apigateway.Cors.ALL_METHODS,
+        )
+        return log_group, policy, unauthenticated_policy, cors
+
+    def _get_alias_or_function(self, aliases, functions, function_name):
+        return (
+            aliases[function_name]
+            if function_name in aliases
+            else functions[function_name]
+        )
+
+    def create_api_gateway_resources(self, functions, aliases):
+        log_group, policy, options_policy, cors = self.create_api_gateway_dependencies()
         apiGateway = apigateway.RestApi(
             self,
             "ApiGateway",
-            policy=iam.PolicyDocument(statements=[policy]),
+            policy=iam.PolicyDocument(statements=[policy, options_policy]),
             default_cors_preflight_options=cors,
             deploy_options=apigateway.StageOptions(
                 access_log_destination=apigateway.LogGroupLogDestination(log_group),
@@ -619,6 +549,7 @@ class PythonStack(Stack):
                 ),
             ),
         )
+
         api = apiGateway.root.add_resource("api")
         navlogs = api.add_resource(
             "navlogs",
@@ -626,7 +557,9 @@ class PythonStack(Stack):
         )
         navlogs.add_method(
             "POST",
-            apigateway.LambdaIntegration(functions["add_navlog"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "add_navlog")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
@@ -636,7 +569,9 @@ class PythonStack(Stack):
         )
         articles.add_method(
             "GET",
-            apigateway.LambdaIntegration(functions["get_articles"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "get_articles")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
@@ -646,40 +581,49 @@ class PythonStack(Stack):
         )
         search.add_method(
             "GET",
-            apigateway.LambdaIntegration(functions["search"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "search")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         search_sub = search.add_resource("{query}")
         search_sub.add_method(
             "GET",
-            apigateway.LambdaIntegration(functions["search"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "search")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
-        themes = api.add_resource(
-            "themes",
-            default_cors_preflight_options=cors,
-        )
+        themes = api.add_resource("themes", default_cors_preflight_options=cors)
         themes.add_method(
             "GET",
-            apigateway.LambdaIntegration(functions["get_themes"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "get_themes")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         themes.add_method(
             "POST",
-            apigateway.LambdaIntegration(functions["add_theme"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "add_theme")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
         themes_sub = themes.add_resource("{title}")
         themes_sub.add_method(
             "GET",
-            apigateway.LambdaIntegration(functions["get_themes"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "get_themes")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         themes_sub.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(functions["del_theme"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "del_theme")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
 
@@ -689,7 +633,9 @@ class PythonStack(Stack):
         themes_sub_related_by_id = themes_sub_related.add_resource("{article_id}")
         themes_sub_related_by_id.add_method(
             "DELETE",
-            apigateway.LambdaIntegration(functions["del_related"]),
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "del_related")
+            ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
         return apiGateway
