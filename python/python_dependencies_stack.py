@@ -1,47 +1,89 @@
-from aws_cdk import Stack, CfnOutput
+from aws_cdk import Stack
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_lambda_python_alpha as lambda_python
+import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
 
 
 class PythonDependenciesStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(
+        self, scope: Construct, construct_id: str, testing: bool = False, **kwargs
+    ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        self.reqs_layer = lambda_python.PythonLayerVersion(
-            self,
-            "RequirementsLayer",
-            entry="python/layer",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer",
+        if testing:
+            # TODO: this is a hack speed up testing, pip won't actually run in this case
+            self.reqs_layer = lambda_.LayerVersion.from_layer_version_arn(
+                self,
+                "RequirementsLayer",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-requirements-layer-prod-v1:1",
+            )
+            self.ai_layer = lambda_.LayerVersion.from_layer_version_arn(
+                self,
+                "AILayer",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-ai-layer-prod-v1:1",
+            )
+            self.more_ai_layer = lambda_.LayerVersion.from_layer_version_arn(
+                self,
+                "MoreAILayer",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-more-ai-layer-prod-v1:1",
+            )
+        else:
+            self.reqs_layer = lambda_python.PythonLayerVersion(
+                self,
+                "RequirementsLayer",
+                entry="python/layer",
+                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+                description="Requirements layer",
+            )
+            self.ai_layer = lambda_python.PythonLayerVersion(
+                self,
+                "AILayer",
+                entry="python/layer_ai",
+                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+                description="Another requirements layer - in order to split deps across zip file limits",
+            )
+            self.more_ai_layer = lambda_python.PythonLayerVersion(
+                self,
+                "MoreAILayer",
+                entry="python/layer_more_ai",
+                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
+                description="Requirements layer for layer2 - more ai",
+                bundling=lambda_python.BundlingOptions(
+                    asset_excludes=[
+                        "*.pyc",
+                        "*.pyo",
+                        "tests/*",
+                        "docs/*",
+                        "pyarrow/*",
+                        "pandas/*",
+                        "openai/*",
+                    ],
+                    environment={
+                        "PYTHONUNBUFFERED": "1",
+                    },
+                ),
+            )
+        self.openai_secret, self.langfuse_secret, self.datadog_secret = (
+            self._create_secrets()
         )
-        self.ai_layer = lambda_python.PythonLayerVersion(
+
+    def _create_secrets(self):
+        openai_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
-            "AILayer",
-            entry="python/layer_ai",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Another requirements layer - in order to split deps across zip file limits",
+            "openai_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
         )
-        self.more_ai_layer = lambda_python.PythonLayerVersion(
+        langfuse_secret = secretsmanager.Secret.from_secret_complete_arn(
             self,
-            "MoreAILayer",
-            entry="python/layer_more_ai",
-            compatible_architectures=[lambda_.Architecture.ARM_64],
-            compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
-            description="Requirements layer for layer2 - more ai",
-            bundling=lambda_python.BundlingOptions(
-                asset_excludes=[
-                    "*.pyc",
-                    "*.pyo",
-                    "tests/*",
-                    "docs/*",
-                    "pyarrow/*",
-                    "pandas/*",
-                    "openai/*",
-                ],
-                environment={
-                    "PYTHONUNBUFFERED": "1",
-                },
-            ),
+            "langfuse_secret_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
         )
+        datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "datadog_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:prod/dassie/datadog-axXB8t",
+        )
+        return openai_secret, langfuse_secret, datadog_secret

@@ -5,14 +5,13 @@ from aws_cdk import Stack, CfnOutput, Duration, TimeZone
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_applicationautoscaling as appscaling
-import aws_cdk.aws_lambda_python_alpha as lambda_python
 import aws_cdk.aws_apigateway as apigateway
 import aws_cdk.aws_dynamodb as dynamodb
 import aws_cdk.aws_rds as rds
 import aws_cdk.aws_ec2 as ec2
 import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
-import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
+
 import aws_cdk.aws_iam as iam
 import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_events as events
@@ -35,152 +34,100 @@ class PythonStack(Stack):
         self,
         scope: Construct,
         construct_id: str,
-        python_dependencies_stack: PythonDependenciesStack,
+        dependencies_stack: PythonDependenciesStack,
         infra_stack: InfraStack,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        self.python_dependencies_stack = python_dependencies_stack
-        self.sql_db = infra_stack.sql_db
-        self.ddb = infra_stack.ddb
-        self.vpc = infra_stack.vpc
-        self.bastion_sg = infra_stack.bastion_sg
-        self.lambda_db_access_sg = infra_stack.lambda_db_access_sg
-        self.openai_secret, self.langfuse_secret = self.create_secrets()
+
         (
             self.bucket,
-            self.reqs_layers,
             self.lambdas_env,
         ) = self.create_common_lambda_dependencies(
-            self.sql_db, self.openai_secret, self.langfuse_secret, self.ddb
+            infra_stack.sql_db,
+            dependencies_stack.openai_secret,
+            dependencies_stack.langfuse_secret,
+            infra_stack.ddb,
         )
-        self.archive_bucket, self.archive_navlog = (
-            self.create_archive_related_resources(
-                self.reqs_layers["reqs_layer"], self.ddb
-            )
+        lambda_function_props = self._get_default_lambda_props(
+            infra_stack.lambda_db_access_sg,
+            [
+                dependencies_stack.reqs_layer,
+                dependencies_stack.ai_layer,
+                dependencies_stack.more_ai_layer,
+            ],
+            self.lambdas_env,
+            infra_stack.vpc,
         )
-        lambda_function_props = {
-            "runtime": lambda_.Runtime.PYTHON_3_9,
-            "code": lambda_.AssetCode.from_asset(
-                path.join(os.getcwd(), "python/lambda")
-            ),
-            "vpc": self.vpc,
-            "security_groups": [self.lambda_db_access_sg],
-            "layers": list(self.reqs_layers.values()),
-            "architecture": lambda_.Architecture.ARM_64,
-            "memory_size": 1024,
-            "environment": self.lambdas_env,
-            "tracing": lambda_.Tracing.PASS_THROUGH,
-            "timeout": Duration.seconds(45),
-        }
         self.aliases = {}
-        self.functions = {
-            "build_articles": self.create_lambda_function(
-                "build_articles",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                {**lambda_function_props, "timeout": Duration.seconds(240)},
-            ),
-            "build_themes": self.create_lambda_function(
-                "build_themes",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                {**lambda_function_props, "timeout": Duration.seconds(120)},
-            ),
-            "get_themes": self.create_lambda_function(
-                "get_themes",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "get_articles": self.create_lambda_function(
-                "get_articles",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "add_theme": self.create_lambda_function(
-                "add_theme",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "process_theme": self.create_lambda_function(
-                "process_theme",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                {**lambda_function_props, "timeout": Duration.minutes(5)},
-            ),
-            "del_theme": self.create_lambda_function(
-                "del_theme",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "del_related": self.create_lambda_function(
-                "del_related",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "search": self.create_lambda_function(
-                "search",
-                self.sql_db,
-                self.openai_secret,
-                self.langfuse_secret,
-                lambda_function_props,
-            ),
-            "add_navlog": self.create_add_navlog_function(
-                self.lambdas_env,
-                self.ddb,
-                self.bucket,
-                self.vpc,
-                self.reqs_layers["reqs_layer"],
-            ),
-        }
-        # self.ddb.grant_read_write_data(self.functions["build_articles"])
+        self.functions = self._get_lambdas(
+            lambda_function_props,
+            infra_stack.ddb,
+            self.bucket,
+            infra_stack.vpc,
+            dependencies_stack.reqs_layer,
+            self.lambdas_env,
+        )
+
+        self.archive_navlog = self.create_archive_function(
+            dependencies_stack.reqs_layer, infra_stack.ddb
+        )
+
         functions_to_dd_instrument = list(self.functions.values())
         functions_to_dd_instrument.append(self.archive_navlog)
-        self.instrument_with_datadog(functions_to_dd_instrument)
-        # self.modify_security_group_for_lambda_access(
-        #     list(self.functions.values()), self.sql_db
-        # )
-
-        self.create_scheduled_event_for_function(
-            "build_articles", self.functions["build_articles"], "27"
-        )
-        self.create_scheduled_event_for_function(
-            "build_themes", self.functions["build_themes"], "47"
+        self.instrument_with_datadog(
+            functions_to_dd_instrument, dependencies_stack.datadog_secret
         )
 
+        self.create_scheduled_event_for_function("build_articles", self.functions, "27")
+        self.create_scheduled_event_for_function("build_themes", self.functions, "47")
+
+        self._connect_add_theme_event_bus(self.functions)
+
+        # Hack to deal with lack of support for aliases on sam local start-api
+        if construct_id != "LocalStack":
+            self._create_auto_scaling_for_lambda(
+                "get_themes", self.aliases, self.functions
+            )
+            self._create_auto_scaling_for_lambda("search", self.aliases, self.functions)
+            self._create_auto_scaling_for_lambda(
+                "add_theme", self.aliases, self.functions
+            )
+
+        self.apiGateway = self.create_api_gateway_resources(
+            self.functions, self.aliases
+        )
+
+        CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
+        CfnOutput(
+            self, ApiGatewayDomainStackOutput, value=self.apiGateway.url.split("/")[2]
+        )
+        CfnOutput(
+            self,
+            ApiGatewayStageStackOutput,
+            value=self.apiGateway.deployment_stage.stage_name,
+        )
+
+    def _connect_add_theme_event_bus(self, functions):
         # Create the EventBus
-        self.event_bus = events.EventBus(
+        event_bus = events.EventBus(
             self,
             "DassieAsyncEvents",
             event_bus_name="dassie-async-events",
         )
-
         # Grant permission to add_theme function to put events to the EventBus
-        self.event_bus.grant_put_events_to(self.functions["add_theme"])
+        event_bus.grant_put_events_to(functions["add_theme"])
 
-        self.add_theme_completion_rule = events.Rule(
+        events.Rule(
             self,
             "AddThemeCompletionRule",
-            event_bus=self.event_bus,
+            event_bus=event_bus,
             event_pattern=events.EventPattern(
                 source=["dassie.lambda"],
                 detail_type=["Lambda Function Invocation Result"],
                 detail={
                     "requestContext": {
-                        "functionName": [self.functions["add_theme"].function_name]
+                        "functionName": [functions["add_theme"].function_name]
                     },
                     "responsePayload": {"statusCode": [202]},
                 },
@@ -195,39 +142,81 @@ class PythonStack(Stack):
             ],
         )
 
-        if construct_id != "LocalStack":
-            self.aliases["get_themes"] = self.create_auto_scaling_for_lambda(
-                self.functions["get_themes"]
-            )
-            self.aliases["search"] = self.create_auto_scaling_for_lambda(
-                self.functions["search"]
-            )
-            self.aliases["add_theme"] = self.create_auto_scaling_for_lambda(
-                self.functions["add_theme"]
-            )
+    def _get_lambdas(
+        self,
+        lambda_function_props,
+        ddb,
+        bucket,
+        vpc,
+        reqs_layer,
+        lambdas_env,
+    ):
+        return {
+            "build_articles": self.create_lambda_function(
+                "build_articles",
+                {**lambda_function_props, "timeout": Duration.seconds(240)},
+            ),
+            "build_themes": self.create_lambda_function(
+                "build_themes",
+                {**lambda_function_props, "timeout": Duration.seconds(120)},
+            ),
+            "get_themes": self.create_lambda_function(
+                "get_themes",
+                lambda_function_props,
+            ),
+            "get_articles": self.create_lambda_function(
+                "get_articles",
+                lambda_function_props,
+            ),
+            "add_theme": self.create_lambda_function(
+                "add_theme",
+                lambda_function_props,
+            ),
+            "process_theme": self.create_lambda_function(
+                "process_theme",
+                {**lambda_function_props, "timeout": Duration.minutes(5)},
+            ),
+            "del_theme": self.create_lambda_function(
+                "del_theme",
+                lambda_function_props,
+            ),
+            "del_related": self.create_lambda_function(
+                "del_related",
+                lambda_function_props,
+            ),
+            "search": self.create_lambda_function(
+                "search",
+                lambda_function_props,
+            ),
+            "add_navlog": self.create_add_navlog_function(
+                lambdas_env,
+                ddb,
+                bucket,
+                vpc,
+                reqs_layer,
+            ),
+        }
 
-        self.apiGateway = self.create_api_gateway_resources(
-            self.functions, self.aliases
-        )
+    def _get_default_lambda_props(
+        self, lambda_db_access_sg, reqs_layers, lambdas_env, vpc
+    ):
+        return {
+            "runtime": lambda_.Runtime.PYTHON_3_9,
+            "code": lambda_.AssetCode.from_asset(
+                path.join(os.getcwd(), "python/lambda")
+            ),
+            "vpc": vpc,
+            "security_groups": [lambda_db_access_sg],
+            "layers": reqs_layers,
+            "architecture": lambda_.Architecture.ARM_64,
+            "memory_size": 1024,
+            "environment": lambdas_env,
+            "tracing": lambda_.Tracing.PASS_THROUGH,
+            "timeout": Duration.seconds(45),
+        }
 
-        CfnOutput(self, ApiGatewayEndpointStackOutput, value=self.apiGateway.url)
+    def instrument_with_datadog(self, functions, datadog_secret):
 
-        CfnOutput(
-            self, ApiGatewayDomainStackOutput, value=self.apiGateway.url.split("/")[2]
-        )
-
-        CfnOutput(
-            self,
-            ApiGatewayStageStackOutput,
-            value=self.apiGateway.deployment_stage.stage_name,
-        )
-
-    def instrument_with_datadog(self, functions):
-        datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "datadog_api_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:prod/dassie/datadog-axXB8t",
-        )
         datadog_ext = datadog.Datadog(
             self,
             "datadog",
@@ -299,7 +288,7 @@ class PythonStack(Stack):
         )
         return ddb
 
-    def create_archive_related_resources(self, deps_layer, ddb):
+    def create_archive_function(self, deps_layer, ddb):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -348,23 +337,14 @@ class PythonStack(Stack):
             max_batching_window=Duration.minutes(5),
         )
 
-        return archive_bucket, archive_function
-
-    def create_secrets(self):
-        openai_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "openai_api_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/openaikey-8BLvR2",
-        )
-        langfuse_secret = secretsmanager.Secret.from_secret_complete_arn(
-            self,
-            "langfuse_secret_key",
-            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:dassie/prod/langfusekey-f9UsZW",
-        )
-        return openai_secret, langfuse_secret
+        return archive_function
 
     def create_common_lambda_dependencies(
-        self, sql_db, openai_secret, langfuse_secret, ddb
+        self,
+        sql_db,
+        openai_secret,
+        langfuse_secret,
+        ddb,
     ):
         bucket = s3.Bucket(
             self,
@@ -372,9 +352,6 @@ class PythonStack(Stack):
             versioned=True,
             encryption=s3.BucketEncryption.S3_MANAGED,
         )
-        reqs_layer = self.python_dependencies_stack.reqs_layer
-        ai_layer = self.python_dependencies_stack.ai_layer
-        more_ai_layer = self.python_dependencies_stack.more_ai_layer
         lambdas_env = {
             "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
@@ -391,11 +368,6 @@ class PythonStack(Stack):
         }
         return (
             bucket,
-            {
-                "reqs_layer": reqs_layer,
-                "ai_layer": ai_layer,
-                "more_ai_layer": more_ai_layer,
-            },
             lambdas_env,
         )
 
@@ -429,9 +401,6 @@ class PythonStack(Stack):
     def create_lambda_function(
         self,
         function_name,
-        sql_db,
-        openai_secret,
-        langfuse_secret,
         lambda_function_props,
     ):
         lambda_function = lambda_.Function(
@@ -440,14 +409,13 @@ class PythonStack(Stack):
             handler=f"{function_name.lower()}.lambda_handler",
             **lambda_function_props,
         )
-        # self.grant_lambda_permissions(
-        #     lambda_function, sql_db, openai_secret, langfuse_secret
-        # )
         return lambda_function
 
-    def create_auto_scaling_for_lambda(self, lambda_function: lambda_.Function):
-        alias = lambda_function.add_alias("provisioned")
-        auto_scaling_target = alias.add_auto_scaling(min_capacity=1, max_capacity=3)
+    def _create_auto_scaling_for_lambda(self, name, aliases, functions):
+        aliases[name] = functions[name].add_alias("provisioned")
+        auto_scaling_target = aliases[name].add_auto_scaling(
+            min_capacity=1, max_capacity=3
+        )
         auto_scaling_target.scale_on_utilization(utilization_target=0.5)
         # auto_scaling_target.scale_on_schedule(
         #     "scale-up-in-the-morning",
@@ -475,7 +443,7 @@ class PythonStack(Stack):
             min_capacity=0,
             max_capacity=0,
         )
-        return alias
+        return aliases[name]
 
     def create_api_gateway_dependencies(self):
         log_group = logs.LogGroup(self, "ApiGatewayAccessLogs")
@@ -484,31 +452,35 @@ class PythonStack(Stack):
             "frontend_role",
             role_arn="arn:aws:iam::559845934392:role/amplify-d1tgde1goqkt1z-ma-amplifyAuthauthenticatedU-y3rmjhCgkLMl",
         )
-        policy = iam.PolicyStatement(
-            sid="allow_google_cognito",
-            effect=iam.Effect.ALLOW,
-            actions=["execute-api:Invoke"],
-            resources=[
-                f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*"
-            ],
-            conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
-            principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
+        api_policy = iam.PolicyDocument(
+            statements=[
+                iam.PolicyStatement(
+                    sid="allow_google_cognito",
+                    effect=iam.Effect.ALLOW,
+                    actions=["execute-api:Invoke"],
+                    resources=[
+                        f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*"  # apiID needs to be manually updated if API recreated
+                    ],
+                    conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
+                    principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
+                ),
+                iam.PolicyStatement(
+                    sid="allow_unauthenticated_options",
+                    effect=iam.Effect.ALLOW,
+                    actions=["execute-api:Invoke"],
+                    resources=[
+                        f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*"  # apiID needs to be manually updated if API recreated
+                    ],
+                    principals=[iam.AnyPrincipal()],
+                ),
+            ]
         )
 
-        unauthenticated_policy = iam.PolicyStatement(
-            sid="allow_unauthenticated_options",
-            effect=iam.Effect.ALLOW,
-            actions=["execute-api:Invoke"],
-            resources=[
-                f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*"
-            ],
-            principals=[iam.AnyPrincipal()],
-        )
         cors = apigateway.CorsOptions(
             allow_origins=apigateway.Cors.ALL_ORIGINS,
             allow_methods=apigateway.Cors.ALL_METHODS,
         )
-        return log_group, policy, unauthenticated_policy, cors
+        return log_group, api_policy, cors
 
     def _get_alias_or_function(self, aliases, functions, function_name):
         return (
@@ -518,11 +490,11 @@ class PythonStack(Stack):
         )
 
     def create_api_gateway_resources(self, functions, aliases):
-        log_group, policy, options_policy, cors = self.create_api_gateway_dependencies()
+        log_group, api_policy, cors = self.create_api_gateway_dependencies()
         apiGateway = apigateway.RestApi(
             self,
             "ApiGateway",
-            policy=iam.PolicyDocument(statements=[policy, options_policy]),
+            policy=api_policy,
             default_cors_preflight_options=cors,
             deploy_options=apigateway.StageOptions(
                 access_log_destination=apigateway.LogGroupLogDestination(log_group),
@@ -549,7 +521,6 @@ class PythonStack(Stack):
                 ),
             ),
         )
-
         api = apiGateway.root.add_resource("api")
         navlogs = api.add_resource(
             "navlogs",
@@ -640,7 +611,7 @@ class PythonStack(Stack):
         )
         return apiGateway
 
-    def create_scheduled_event_for_function(self, name, function, minute):
+    def create_scheduled_event_for_function(self, name, functions, minute):
         rule = events.Rule(
             self,
             name + "ScheduleRule",
@@ -650,4 +621,4 @@ class PythonStack(Stack):
         )
 
         # Add the Lambda function as a target for this rule
-        rule.add_target(targets.LambdaFunction(function))
+        rule.add_target(targets.LambdaFunction(functions[name]))

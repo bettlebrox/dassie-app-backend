@@ -31,7 +31,7 @@ infra_stack = InfraStack(
 python_stack = PythonStack(
     app,
     stack_name,
-    python_dependencies_stack=python_dependencies_stack,
+    dependencies_stack=python_dependencies_stack,
     infra_stack=infra_stack,
     env=cdk.Environment(account=os.environ["AWS_ACCOUNT_ID"], region="eu-west-1"),
 )
@@ -42,6 +42,7 @@ permissions_stack = PermissionsStack(
     "DassiePermissionsStack",
     python_stack=python_stack,
     infra_stack=infra_stack,
+    dependencies_stack=python_dependencies_stack,
     env=cdk.Environment(account=os.environ["AWS_ACCOUNT_ID"], region="eu-west-1"),
 )
 permissions_stack.add_dependency(python_stack)

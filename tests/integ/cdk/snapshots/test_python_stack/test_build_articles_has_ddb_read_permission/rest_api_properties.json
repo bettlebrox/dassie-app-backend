@@ -1,0 +1,31 @@
+{
+  "Name": "ApiGateway",
+  "Policy": {
+    "Statement": [
+      {
+        "Action": "execute-api:Invoke",
+        "Condition": {
+          "ArnLike": {
+            "AWS:SourceArn": "arn:aws:iam::559845934392:role/amplify-d1tgde1goqkt1z-ma-amplifyAuthauthenticatedU-y3rmjhCgkLMl"
+          }
+        },
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "apigateway.amazonaws.com"
+        },
+        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*",
+        "Sid": "allow_google_cognito"
+      },
+      {
+        "Action": "execute-api:Invoke",
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "*"
+        },
+        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*",
+        "Sid": "allow_unauthenticated_options"
+      }
+    ],
+    "Version": "2012-10-17"
+  }
+}
