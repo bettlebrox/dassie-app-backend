@@ -1,10 +1,10 @@
 import aws_cdk as core
 import aws_cdk.assertions as assertions
 import pytest
-from pprint import pprint
 from python_stack import PythonStack
 from infra_stack import InfraStack
 from python_dependencies_stack import PythonDependenciesStack
+import json
 
 
 @pytest.fixture
@@ -124,8 +124,6 @@ def test_build_articles_has_ddb_read_permission(backend_template, snapshot):
     rest_api_resources = backend_template.find_resources("AWS::ApiGateway::RestApi")
     assert len(rest_api_resources) == 1
     first_resource = next(iter(rest_api_resources.values()))
-    import json
-
     snapshot.assert_match(
         json.dumps(first_resource["Properties"], indent=2), "rest_api_properties.json"
     )
