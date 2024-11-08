@@ -14,7 +14,16 @@ def app():
 
 @pytest.fixture
 def python_dependencies_stack(app):
-    return PythonDependenciesStack(app, "python-dependencies", testing=True)
+    stack = PythonDependenciesStack(app, "python-dependencies", testing=True)
+    # simulate the hack to 'sam local start-api' hack
+    stack.reqs_layer_arn = (
+        "arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:45"
+    )
+    stack.ai_layer_arn = "arn:aws:lambda:eu-west-1:559845934392:layer:AILayerD278B124:1"
+    stack.more_ai_layer_arn = (
+        "arn:aws:lambda:eu-west-1:559845934392:layer:MoreAILayer75E81DE2:2"
+    )
+    return stack
 
 
 @pytest.fixture

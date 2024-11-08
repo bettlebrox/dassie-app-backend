@@ -1,4 +1,4 @@
-from aws_cdk import Stack
+from aws_cdk import CfnOutput, Stack
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_lambda_python_alpha as lambda_python
@@ -9,23 +9,24 @@ class PythonDependenciesStack(Stack):
     def __init__(
         self, scope: Construct, construct_id: str, testing: bool = False, **kwargs
     ) -> None:
+
         super().__init__(scope, construct_id, **kwargs)
         if testing:
             # TODO: this is a hack speed up testing, pip won't actually run in this case
             self.reqs_layer = lambda_.LayerVersion.from_layer_version_arn(
                 self,
                 "RequirementsLayer",
-                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-requirements-layer-prod-v1:1",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:45",
             )
             self.ai_layer = lambda_.LayerVersion.from_layer_version_arn(
                 self,
                 "AILayer",
-                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-ai-layer-prod-v1:1",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:AILayerD278B124:1",
             )
             self.more_ai_layer = lambda_.LayerVersion.from_layer_version_arn(
                 self,
                 "MoreAILayer",
-                "arn:aws:lambda:eu-west-1:559845934392:layer:dassie-app-backend-more-ai-layer-prod-v1:1",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:MoreAILayer75E81DE2:2",
             )
         else:
             self.reqs_layer = lambda_python.PythonLayerVersion(
@@ -68,6 +69,24 @@ class PythonDependenciesStack(Stack):
             )
         self.openai_secret, self.langfuse_secret, self.datadog_secret = (
             self._create_secrets()
+        )
+        CfnOutput(
+            self,
+            "ReqsLayerOutput",
+            value=self.reqs_layer.layer_version_arn,
+            export_name="ReqsLayer",
+        )
+        CfnOutput(
+            self,
+            "AILayerOutput",
+            value=self.ai_layer.layer_version_arn,
+            export_name="AILayer",
+        )
+        CfnOutput(
+            self,
+            "MoreAILayerOutput",
+            value=self.more_ai_layer.layer_version_arn,
+            export_name="MoreAILayer",
         )
 
     def _create_secrets(self):

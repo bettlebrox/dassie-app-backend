@@ -40,6 +40,12 @@ class PythonStack(Stack):
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        reqs_layer, ai_layer, more_ai_layer = self._get_layer_from_arns(
+            dependencies_stack.reqs_layer_arn,
+            dependencies_stack.ai_layer_arn,
+            dependencies_stack.more_ai_layer_arn,
+        )
+
         (
             self.bucket,
             self.lambdas_env,
@@ -51,11 +57,7 @@ class PythonStack(Stack):
         )
         lambda_function_props = self._get_default_lambda_props(
             infra_stack.lambda_db_access_sg,
-            [
-                dependencies_stack.reqs_layer,
-                dependencies_stack.ai_layer,
-                dependencies_stack.more_ai_layer,
-            ],
+            [reqs_layer, ai_layer, more_ai_layer],
             self.lambdas_env,
             infra_stack.vpc,
         )
@@ -65,13 +67,11 @@ class PythonStack(Stack):
             infra_stack.ddb,
             self.bucket,
             infra_stack.vpc,
-            dependencies_stack.reqs_layer,
+            reqs_layer,
             self.lambdas_env,
         )
 
-        self.archive_navlog = self.create_archive_function(
-            dependencies_stack.reqs_layer, infra_stack.ddb
-        )
+        self.archive_navlog = self.create_archive_function(reqs_layer, infra_stack.ddb)
 
         functions_to_dd_instrument = list(self.functions.values())
         functions_to_dd_instrument.append(self.archive_navlog)
@@ -107,6 +107,27 @@ class PythonStack(Stack):
             ApiGatewayStageStackOutput,
             value=self.apiGateway.deployment_stage.stage_name,
         )
+
+    def _get_layer_from_arns(
+        self, reqs_layer_arn: str, ai_layer_arn: str, more_ai_layer_arn: str
+    ):
+        # SAM needs the layer arns to be set before run local start-api
+        reqs_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self,
+            "RequirementsLayer",
+            reqs_layer_arn,
+        )
+        ai_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self,
+            "AILayer",
+            ai_layer_arn,
+        )
+        more_ai_layer = lambda_.LayerVersion.from_layer_version_arn(
+            self,
+            "MoreAILayer",
+            more_ai_layer_arn,
+        )
+        return reqs_layer, ai_layer, more_ai_layer
 
     def _connect_add_theme_event_bus(self, functions):
         # Create the EventBus
