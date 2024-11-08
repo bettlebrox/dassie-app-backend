@@ -2,6 +2,7 @@ from aws_cdk import Duration, Stack
 from constructs import Construct
 import aws_cdk.aws_ec2 as ec2
 import aws_cdk.aws_rds as rds
+import aws_cdk.aws_neptune_alpha as neptune
 import aws_cdk.aws_iam as iam
 import aws_cdk.aws_dynamodb as dynamodb
 
@@ -11,7 +12,7 @@ class InfraStack(Stack):
         self,
         scope: Construct,
         id: str,
-        snapshot_arn: str = "arn:aws:rds:eu-west-1:559845934392:cluster-snapshot:replace",
+        sql_snapshot_arn: str = "arn:aws:rds:eu-west-1:559845934392:cluster-snapshot:replace",
         **kwargs
     ):
         super().__init__(scope, id, **kwargs)
@@ -21,9 +22,14 @@ class InfraStack(Stack):
         self.sql_db, self.lambda_db_access_sg = self.create_postgres_database(
             self.vpc,
             self.bastion_sg,
-            snapshot_id=snapshot_arn,
+            snapshot_id=sql_snapshot_arn,
         )
         self.ddb = self.create_ddb_table()
+        self.neptune_cluster, self.lambda_neptune_access_sg = self.create_neptune_db(
+            self.vpc,
+            self.bastion_sg,
+            "arn:aws:rds:eu-west-1:559845934392:cluster-snapshot:replace1",
+        )
 
     def create_bastion(self):
         # Create security group for bastion host
@@ -76,6 +82,38 @@ class InfraStack(Stack):
         )
 
         return bastion, bastion_sg
+
+    def create_neptune_db(self, vpc, bastion_sg, snapshot_arn=None):
+        # Create a security group for the Neptune cluster
+        neptune_sg = ec2.SecurityGroup(
+            self,
+            "NeptuneSG",
+            vpc=self.vpc,
+            description="Security group for Neptune cluster",
+            allow_all_outbound=True,
+        )
+        lambda_neptune_access_sg = ec2.SecurityGroup(
+            self,
+            "LambdaNeptuneAccessSG",
+            vpc=vpc,
+        )
+
+        # Create the Neptune cluster
+        common_props = {
+            "instance_type": neptune.InstanceType.T4_G_MEDIUM,
+            "vpc": vpc,
+            "vpc_subnets": ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
+            ),
+            "security_groups": [neptune_sg],
+        }
+        # neptune_cluster = neptune.DatabaseCluster(
+        #     self, "NeptuneCluster", **common_props
+        # )
+        # neptune_cluster.connections.add_security_group(neptune_sg)
+        neptune_sg.add_ingress_rule(lambda_neptune_access_sg, ec2.Port.tcp(8182))
+        neptune_sg.add_ingress_rule(bastion_sg, ec2.Port.tcp(8182))
+        return None, lambda_neptune_access_sg
 
     def create_ddb_table(self):
         ddb = dynamodb.Table(

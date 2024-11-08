@@ -57,6 +57,7 @@ class PythonStack(Stack):
         )
         lambda_function_props = self._get_default_lambda_props(
             infra_stack.lambda_db_access_sg,
+            infra_stack.lambda_neptune_access_sg,
             [reqs_layer, ai_layer, more_ai_layer],
             self.lambdas_env,
             infra_stack.vpc,
@@ -219,7 +220,12 @@ class PythonStack(Stack):
         }
 
     def _get_default_lambda_props(
-        self, lambda_db_access_sg, reqs_layers, lambdas_env, vpc
+        self,
+        lambda_db_access_sg,
+        lambda_neptune_access_sg,
+        reqs_layers,
+        lambdas_env,
+        vpc,
     ):
         return {
             "runtime": lambda_.Runtime.PYTHON_3_9,
@@ -227,7 +233,7 @@ class PythonStack(Stack):
                 path.join(os.getcwd(), "python/lambda")
             ),
             "vpc": vpc,
-            "security_groups": [lambda_db_access_sg],
+            "security_groups": [lambda_db_access_sg, lambda_neptune_access_sg],
             "layers": reqs_layers,
             "architecture": lambda_.Architecture.ARM_64,
             "memory_size": 1024,
