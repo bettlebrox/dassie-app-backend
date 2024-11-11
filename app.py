@@ -35,15 +35,15 @@ def get_output_value(key, default=None):
 
 
 python_dependencies_stack.reqs_layer_arn = get_output_value(
-    "ReqsLayer",
+    "ReqsLayerOutput",
     "arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:45",
 )
 python_dependencies_stack.ai_layer_arn = get_output_value(
-    "AILayer",
+    "AILayerOutput",
     "arn:aws:lambda:eu-west-1:559845934392:layer:AILayerD278B124:1",
 )
 python_dependencies_stack.more_ai_layer_arn = get_output_value(
-    "MoreAILayer",
+    "MoreAILayerOutput",
     "arn:aws:lambda:eu-west-1:559845934392:layer:MoreAILayer75E81DE2:2",
 )
 

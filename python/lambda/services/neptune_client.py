@@ -2,7 +2,7 @@ import os
 from typing import Literal
 import boto3
 import re
-
+import json
 from dassie_logger import logger
 from models.article import Article
 from models.theme import Theme
@@ -197,7 +197,29 @@ where not exists(m.name) and not exists(m.label)
                 self.execute(query, rewrite_query=False)
 
     def get_theme_graph(self, theme_title: str):
-        return self.query(
-            f"""match (t:Theme {{title:"{theme_title}"}})-[r:RELATED_TO]->(a:Article)-[q:SOURCE_OF]-(b)-[s]-(c)
-return a,q,b,s,c"""
+        return self._convert_to_react_flow_format(
+            self.query(
+                f"""MATCH (t:Theme {{name: "{theme_title}"}})-[r:RELATED_TO]->(a:Article)-[s:SOURCE_OF]-(entity)-[entity_rel]-(related_entity)
+WITH entity, entity_rel, related_entity, COUNT(a) AS articleCount
+WHERE articleCount > 3 and type(entity_rel) <> "SOURCE_OF"
+RETURN COLLECT(DISTINCT entity) AS entities, COLLECT(DISTINCT entity_rel) AS rels, COLLECT(DISTINCT related_entity) AS rel_entities"""
+            )
         )
+
+    def _convert_to_react_flow_format(self, results):
+        graph = results[0]
+        entities = graph["entities"] + graph["rel_entities"]
+        nodes = [
+            {
+                "id": node["~id"],
+                "type": "entity",
+                "position": {"x": 0, "y": 0},
+                "data": node,
+            }
+            for node in entities
+        ]
+        edges = [
+            {"id": rel["~id"], "source": rel["~start"], "target": rel["~end"]}
+            for rel in graph["rels"]
+        ]
+        return {"nodes": nodes, "edges": edges}

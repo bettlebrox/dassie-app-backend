@@ -51,6 +51,7 @@ class PythonStack(Stack):
             self.lambdas_env,
         ) = self.create_common_lambda_dependencies(
             infra_stack.sql_db,
+            "https://dassie.cluster-c9w86oa4s60z.eu-west-1.neptune.amazonaws.com:8182",
             dependencies_stack.openai_secret,
             dependencies_stack.langfuse_secret,
             infra_stack.ddb,
@@ -184,6 +185,10 @@ class PythonStack(Stack):
             ),
             "get_themes": self.create_lambda_function(
                 "get_themes",
+                lambda_function_props,
+            ),
+            "get_theme_graph": self.create_lambda_function(
+                "get_theme_graph",
                 lambda_function_props,
             ),
             "get_articles": self.create_lambda_function(
@@ -369,6 +374,7 @@ class PythonStack(Stack):
     def create_common_lambda_dependencies(
         self,
         sql_db,
+        neptune_endpoint,
         openai_secret,
         langfuse_secret,
         ddb,
@@ -381,6 +387,7 @@ class PythonStack(Stack):
         )
         lambdas_env = {
             "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
+            "NEPTUNE_ENDPOINT": neptune_endpoint,
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
             "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
             "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
@@ -624,7 +631,16 @@ class PythonStack(Stack):
             ),
             authorization_type=apigateway.AuthorizationType.IAM,
         )
-
+        theme_sub_graph = themes_sub.add_resource(
+            "graph", default_cors_preflight_options=cors
+        )
+        theme_sub_graph.add_method(
+            "GET",
+            apigateway.LambdaIntegration(
+                self._get_alias_or_function(aliases, functions, "get_theme_graph")
+            ),
+            authorization_type=apigateway.AuthorizationType.IAM,
+        )
         themes_sub_related = themes_sub.add_resource(
             "related", default_cors_preflight_options=cors
         )

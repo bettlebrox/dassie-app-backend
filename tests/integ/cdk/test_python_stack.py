@@ -124,7 +124,7 @@ def test_scheduled_event_created(backend_template):
 
 
 def test_resources_created(backend_template):
-    backend_template.resource_count_is("AWS::Lambda::Function", 11)
+    backend_template.resource_count_is("AWS::Lambda::Function", 12)
 
     backend_template.resource_count_is("AWS::ApiGateway::RestApi", 1)
 

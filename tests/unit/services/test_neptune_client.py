@@ -4,6 +4,7 @@ from models.article import Article
 from models.theme import Theme
 from models.browse import Browse
 from services.neptune_client import NeptuneClient
+import json
 
 
 @patch("boto3.Session")
@@ -197,3 +198,103 @@ def test_upsert_theme():
         openCypherQuery='\n        merge (t:Theme {id: "test"})\n        on create set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = "456"\n        on match set t.domain = "dassie_browse", t.source = "article", t.created_at = "2024-02-29T16:25:00+00:00", t.name = "Test", t.title = "test", t.trace_id = t.trace_id + ",456"\n        \n        merge (a0:Article {id: "test"})\n        on create set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = "456"\n        on match set a0.domain = "dassie_browse", a0.title = "test", a0.url = "https://test.com", a0.created_at = "None", a0.updated_at = "None", a0.trace_id = a0.trace_id + ",456"\n        merge (t)-[:RELATED_TO]->(a0)\n'
     )
     assert res == []
+
+
+def test_convert_to_react_flow_format_empty():
+    client = NeptuneClient("https://test-endpoint:8182", "test", langfuse_enabled=False)
+    result = client._convert_to_react_flow_format(
+        [{"entities": [], "rels": [], "rel_entities": []}]
+    )
+    assert result == {"nodes": [], "edges": []}
+
+
+def test_convert_to_react_flow_format():
+    client = NeptuneClient("https://test-endpoint:8182", "test", langfuse_enabled=False)
+
+    # Test input that matches the expected format
+    neptune_query_result = [
+        {
+            "entities": [
+                {
+                    "~id": "node1",
+                    "~entityType": "node",
+                    "~labels": ["Test"],
+                    "~properties": {"name": "Test Node 1"},
+                }
+            ],
+            "rels": [
+                {"~id": "rel1", "~start": "node1", "~end": "node2", "~type": "TEST_REL"}
+            ],
+            "rel_entities": [
+                {
+                    "~id": "node2",
+                    "~entityType": "node",
+                    "~labels": ["Test"],
+                    "~properties": {"name": "Test Node 2"},
+                }
+            ],
+        }
+    ]
+
+    result = client._convert_to_react_flow_format(neptune_query_result)
+
+    # Verify the structure matches expected React Flow format
+    assert "nodes" in result
+    assert "edges" in result
+
+    # Verify nodes are formatted correctly
+    assert len(result["nodes"]) == 2
+    assert result["nodes"][0] == {
+        "id": "node1",
+        "type": "entity",
+        "position": {"x": 0, "y": 0},
+        "data": {
+            "~id": "node1",
+            "~entityType": "node",
+            "~labels": ["Test"],
+            "~properties": {"name": "Test Node 1"},
+        },
+    }
+
+    # Verify edges are formatted correctly
+    assert len(result["edges"]) == 1
+    assert result["edges"][0] == {"id": "rel1", "source": "node1", "target": "node2"}
+
+    # Test input that matches the expected format
+    with open(
+        "dassie-app-backend/tests/unit/services/neptune_graph_query_response.json", "r"
+    ) as file:
+        neptune_query_result = json.load(file)
+
+    result = client._convert_to_react_flow_format(neptune_query_result["results"])
+
+    # Verify the structure matches expected React Flow format
+    assert "nodes" in result
+    assert "edges" in result
+
+    # Verify nodes are formatted correctly
+    assert len(result["nodes"]) == 57
+    assert result["nodes"][0] == {
+        "id": "04e6c122-c4a8-438e-886e-5b0ab3709b1c0",
+        "type": "entity",
+        "position": {"x": 0, "y": 0},
+        "data": {
+            "~id": "04e6c122-c4a8-438e-886e-5b0ab3709b1c0",
+            "~entityType": "node",
+            "~labels": ["Policy"],
+            "~properties": {
+                "name": "W3C Patent Policy",
+                "id": "dbpedia:Patent_Policy",
+                "description": "Policy governing patent disclosures related to W3C deliverables.",
+                "label": "W3C Patent Policy",
+            },
+        },
+    }
+
+    # Verify edges are formatted correctly
+    assert len(result["edges"]) == 32
+    assert result["edges"][0] == {
+        "id": "be04eb6a-8f38-47de-a825-9c078a395ffd0",
+        "source": "32303752-6bb0-4dd2-8a6e-1f0d2fa368580",
+        "target": "7bc97ab1-2c6e-434c-b780-a5f0401e5b6f0",
+    }

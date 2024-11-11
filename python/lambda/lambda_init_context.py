@@ -10,6 +10,7 @@ import json
 import os
 from theme_repo import ThemeRepository
 from dassie_logger import logger
+from services.neptune_client import NeptuneClient
 
 
 class LambdaInitContext:
@@ -29,6 +30,9 @@ class LambdaInitContext:
         navlog_service=None,
         browse_repo=None,
         boto_event_client=None,
+        neptune_client=None,
+        openai_secret=None,
+        lang_fuse_secret=None,
     ):
         logger.info("init lambda context")
         self._secrets_manager = secrets_manager
@@ -42,6 +46,22 @@ class LambdaInitContext:
         self._browsed_repo = None
         self._navlog_service = navlog_service
         self._boto_event_client = boto_event_client
+        self._neptune_client = neptune_client
+        self._openai_secret = openai_secret
+        self._lang_fuse_secret = lang_fuse_secret
+
+    @property
+    def neptune_client(self):
+        if self._neptune_client is None:
+            logger.info(
+                "init neptune client",
+                extra={"neptune_endpoint": os.getenv("NEPTUNE_ENDPOINT")},
+            )
+            self._neptune_client = NeptuneClient(
+                os.getenv("NEPTUNE_ENDPOINT"),
+                self.lang_fuse_secret,
+            )
+        return self._neptune_client
 
     @property
     def boto_event_client(self):
@@ -120,6 +140,26 @@ class LambdaInitContext:
         logger.debug("retrieved article repo")
         return self._article_repo
 
+    def _get_secret_string_from_arn(self, arn, key):
+        get_secret_value_response = self.secrets_manager.get_secret_value(SecretId=arn)
+        return json.loads(get_secret_value_response["SecretString"])[key]
+
+    @property
+    def openai_secret(self):
+        if self._openai_secret is None:
+            self._openai_secret = self._get_secret_string_from_arn(
+                os.environ["OPENAIKEY_SECRET_ARN"], self.OPENAI_SECRET_KEY
+            )
+        return self._openai_secret
+
+    @property
+    def lang_fuse_secret(self):
+        if self._lang_fuse_secret is None:
+            self._lang_fuse_secret = self._get_secret_string_from_arn(
+                os.environ["LANGFUSE_SECRET_ARN"], self.LANGFUSE_SECRET_KEY
+            )
+        return self._lang_fuse_secret
+
     @property
     def openai_client(self):
         if self._openai_client is None:
@@ -130,17 +170,9 @@ class LambdaInitContext:
                     "langfuse_secret_arn": os.environ["LANGFUSE_SECRET_ARN"],
                 },
             )
-            get_secret_value_response = self.secrets_manager.get_secret_value(
-                SecretId=os.environ["OPENAIKEY_SECRET_ARN"]
-            )
-            secret = json.loads(get_secret_value_response["SecretString"])
-            get_secret_value_response = self.secrets_manager.get_secret_value(
-                SecretId=os.environ["LANGFUSE_SECRET_ARN"]
-            )
-            lang_fuse_secret = json.loads(get_secret_value_response["SecretString"])
             self._openai_client = OpenAIClient(
-                secret[self.OPENAI_SECRET_KEY],
-                lang_fuse_secret[self.LANGFUSE_SECRET_KEY],
+                self.openai_secret,
+                self.lang_fuse_secret,
             )
         logger.debug("retrieved openai client")
         return self._openai_client
