@@ -48,5 +48,5 @@
 			}
 		}
 	},
-	"postCreateCommand": "pip install -r requirements.txt && npm install -g aws-cdk"
+	"postCreateCommand": "pip install -r requirements.txt && npm install -g aws-cdk && git config --global user.email \"474346+bettlebrox@users.noreply.github.com\""
 }
