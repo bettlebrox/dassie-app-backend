@@ -34,5 +34,4 @@ data/.ipynb_checkpoints/get_article_summarization-checkpoint.csv
 template_output.json
 
 python/layer2/**/*
-python/layer_more_ai/**/*
 backend_template.json
