@@ -240,7 +240,7 @@ class PythonStack(Stack):
             "vpc": vpc,
             "security_groups": [lambda_db_access_sg, lambda_neptune_access_sg],
             "layers": reqs_layers,
-            "architecture": lambda_.Architecture.ARM_64,
+            "architecture": lambda_.Architecture.X86_64,
             "memory_size": 1024,
             "environment": lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,

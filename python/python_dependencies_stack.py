@@ -33,7 +33,7 @@ class PythonDependenciesStack(Stack):
                 self,
                 "RequirementsLayer",
                 entry="python/layer",
-                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_architectures=[lambda_.Architecture.X86_64],
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
                 description="Requirements layer",
             )
@@ -41,7 +41,7 @@ class PythonDependenciesStack(Stack):
                 self,
                 "AILayer",
                 entry="python/layer_ai",
-                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_architectures=[lambda_.Architecture.X86_64],
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
                 description="Another requirements layer - in order to split deps across zip file limits",
             )
@@ -49,7 +49,7 @@ class PythonDependenciesStack(Stack):
                 self,
                 "MoreAILayer",
                 entry="python/layer_more_ai",
-                compatible_architectures=[lambda_.Architecture.ARM_64],
+                compatible_architectures=[lambda_.Architecture.X86_64],
                 compatible_runtimes=[lambda_.Runtime.PYTHON_3_9],
                 description="Requirements layer for layer2 - more ai",
                 bundling=lambda_python.BundlingOptions(

@@ -25,7 +25,7 @@ python_dependencies_stack = PythonDependenciesStack(
 )
 
 # SAM needs the layer arns to be set before run local start-api
-cfn_client = boto3.client("cloudformation")
+cfn_client = boto3.client("cloudformation", region_name="eu-west-1")
 response = cfn_client.describe_stacks(StackName="DassiePythonDependenciesStack")
 outputs = response["Stacks"][0]["Outputs"]
 

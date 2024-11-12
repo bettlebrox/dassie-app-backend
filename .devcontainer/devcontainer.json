@@ -13,6 +13,40 @@
 	// Features add additional features to your environment. See https://containers.dev/features
 	// Beware: features are not supported on all platforms and may have unintended side-effects.
 	"features": {
-        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
-    }
+        "ghcr.io/devcontainers/features/python:1": {"version": "3.9.18"},
+		"ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/devcontainers/features/node:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker": {},
+		"ghcr.io/devcontainers/features/sam-cli:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.env.linux": {
+					"AWS_ACCOUNT_ID": "559845934392"  // Replace with your variable name and value
+				}
+			},
+			"tasks": {
+				"deploy": {
+					"label": "Deploy CDK Stack",
+					"type": "shell",
+					"command": "cdk deploy --all",
+					"problemMatcher": []
+				},
+				"synth": {
+					"label": "Synthesize CDK Stack",
+					"type": "shell",
+					"command": "env LOCAL_TESTING=true cdk synth --no-staging",
+					"problemMatcher": []
+				},
+				"start-api": {
+					"label": "Start API",
+					"type": "shell",
+					"command": "sam local start-api -t ./cdk.out/LocalStack.template.json  --warm-containers eager --env-vars python/lambda/local.json --log-file /tmp/local-start-api.log",
+					"problemMatcher": []
+				}
+			}
+		}
+	},
+	"postCreateCommand": "pip install -r requirements.txt && npm install -g aws-cdk"
 }
