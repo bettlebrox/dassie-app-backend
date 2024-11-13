@@ -17,12 +17,25 @@ class PermissionsStack(Stack):
         python_stack: PythonStack,
         infra_stack: InfraStack,
         dependencies_stack: PythonDependenciesStack,
+        dev_env_instance_role_arn: str = "arn:aws:iam::559845934392:role/Gitpod-gitpodec2runnerinstancerole559EF735-5LajPS4Qj7cP",
         **kwargs,
     ):
         super().__init__(scope, id, **kwargs)
         self.build_article = python_stack.functions["build_articles"]
         self.ddb = infra_stack.ddb
         self.ddb.grant_read_write_data(self.build_article)
+        if dev_env_instance_role_arn is not None:
+            self.dev_env_instance_role = aws_iam.Role.from_role_arn(
+                self,
+                "dev_env_instance_role",
+                dev_env_instance_role_arn,
+            )
+            self.grant_lambda_permissions(
+                self.dev_env_instance_role,
+                infra_stack.sql_db,
+                dependencies_stack.openai_secret,
+                dependencies_stack.langfuse_secret,
+            )
         for function in python_stack.functions.values():
             if function.is_bound_to_vpc:
                 self.grant_lambda_permissions(
@@ -38,12 +51,12 @@ class PermissionsStack(Stack):
 
     def grant_lambda_permissions(
         self,
-        lambda_function,
+        principle,
         sql_db,
         openai_secret,
         langfuse_secret,
     ):
-        sql_db.grant_data_api_access(lambda_function)
-        sql_db.secret.grant_read(lambda_function)
-        openai_secret.grant_read(lambda_function)
-        langfuse_secret.grant_read(lambda_function)
+        sql_db.grant_data_api_access(principle)
+        sql_db.secret.grant_read(principle)
+        openai_secret.grant_read(principle)
+        langfuse_secret.grant_read(principle)
