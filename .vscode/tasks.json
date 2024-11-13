@@ -1,0 +1,57 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Deploy CDK Stack",
+            "type": "shell",
+            "command": "cdk deploy --all",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "Synthesize CDK Stack",
+            "type": "shell",
+            "command": "env LOCAL_TESTING=true cdk synth --no-staging",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "Start API",
+            "type": "shell",
+            "command": "sam local start-api -t ${workspaceFolder}/cdk.out/LocalStack.template.json  --warm-containers lazy --env-vars ${workspaceFolder}/python/lambda/local.json --log-file /tmp/local-start-api.log",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        },
+        {
+            "label": "Tail API",
+            "type": "shell",
+            "command": "tail -f /tmp/local-start-api.log | jq -R -r '. as $line | try (fromjson | .timestamp +\"\\t\"+.function_request_id +\"\\t\" + .function_name +\"\\t\"+.level +\"\\t\"+.location +\"\\t\"+.message + \"\\t\" + .exception +\"\\t\" + .query) catch $line'",
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "showReuseMessage": false,
+                "clear": false
+            }
+        }
+    ]
+}

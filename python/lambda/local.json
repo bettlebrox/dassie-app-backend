@@ -1,0 +1,84 @@
+{
+    "get_articles": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "OPENAIKEY_SECRET_ARN": "dassie/prod/openaikey",
+      "LANGFUSE_SECRET_ARN": "dassie/prod/langfusekey",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "get_themes": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "OPENAIKEY_SECRET_ARN": "dassie/prod/openaikey",
+      "LANGFUSE_SECRET_ARN": "dassie/prod/langfusekey",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "search": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "OPENAIKEY_SECRET_ARN": "dassie/prod/openaikey",
+      "LANGFUSE_SECRET_ARN": "dassie/prod/langfusekey",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "del_related": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "del_theme": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "add_theme": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "OPENAIKEY_SECRET_ARN": "dassie/prod/openaikey",
+      "LANGFUSE_SECRET_ARN": "dassie/prod/langfusekey",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "process_theme": {
+      "DD_LOCAL_TEST": "true",
+      "DB_CLUSTER_ENDPOINT": "dassieinfrastack-dassie188a3b291-1b60vwlbq167.cluster-c9w86oa4s60z.eu-west-1.rds.amazonaws.com",
+      "DB_SECRET_ARN": "dassie1Secret6D60D970-deDESR2ba2MI",
+      "OPENAIKEY_SECRET_ARN": "dassie/prod/openaikey",
+      "LANGFUSE_SECRET_ARN": "dassie/prod/langfusekey",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "add_navlog": {
+      "DD_LOCAL_TEST": "true",
+      "DDB_TABLE": "DassieInfraStack-navlogDB0A59EC5D-1MU53DWZGJNB6",
+      "BUCKET_NAME": "dassieappbackendstack--navlogimages0c68e55c-icdr4lhbvevu",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true"
+    },
+    "get_theme_graph": {
+      "DD_LOCAL_TEST": "true",
+      "DD_SERVERLESS_LOGS_ENABLED": "false",
+      "DD_TRACE_ENABLED": "false",
+      "LOCAL_TESTING": "true",
+      "NEPTUNE_ENDPOINT": "https://dassie.cluster-c9w86oa4s60z.eu-west-1.neptune.amazonaws.com:8182"
+    }
+}
+  
