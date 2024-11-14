@@ -5,6 +5,7 @@ from models.theme import Theme
 from models.browse import Browse
 from services.neptune_client import NeptuneClient
 import json
+import os
 
 
 @patch("boto3.Session")
@@ -203,7 +204,15 @@ def test_upsert_theme():
 def test_convert_to_react_flow_format_empty():
     client = NeptuneClient("https://test-endpoint:8182", "test", langfuse_enabled=False)
     result = client._convert_to_react_flow_format(
-        [{"entities": [], "rels": [], "rel_entities": []}]
+        [
+            {
+                "entities": [],
+                "rels": [],
+                "rel_entities": [],
+                "articles": [],
+                "source_rels": [],
+            }
+        ]
     )
     assert result == {"nodes": [], "edges": []}
 
@@ -233,6 +242,8 @@ def test_convert_to_react_flow_format():
                     "~properties": {"name": "Test Node 2"},
                 }
             ],
+            "articles": [],
+            "source_rels": [],
         }
     ]
 
@@ -261,8 +272,9 @@ def test_convert_to_react_flow_format():
     assert result["edges"][0] == {"id": "rel1", "source": "node1", "target": "node2"}
 
     # Test input that matches the expected format
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     with open(
-        "dassie-app-backend/tests/unit/services/neptune_graph_query_response.json", "r"
+        os.path.join(current_dir, "neptune_graph_query_response.json"), "r"
     ) as file:
         neptune_query_result = json.load(file)
 

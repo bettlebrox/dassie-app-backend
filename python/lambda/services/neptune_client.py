@@ -1,13 +1,12 @@
 import os
-from typing import Literal
 import boto3
 import re
-import json
 from dassie_logger import logger
 from models.article import Article
 from models.theme import Theme
 from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
+import random
 
 
 class NeptuneClient:
@@ -135,7 +134,7 @@ class NeptuneClient:
             set n.name = n.label
             with count(*) as dummy
             match (m)
-where not exists(m.name) and not exists(m.label)
+            where not exists(m.name) and not exists(m.label)
             set m.name = m.id
             with count(*) as dummy
             match (a)
@@ -199,16 +198,33 @@ where not exists(m.name) and not exists(m.label)
     def get_theme_graph(self, theme_title: str):
         return self._convert_to_react_flow_format(
             self.query(
-                f"""MATCH (t:Theme {{name: "{theme_title}"}})-[r:RELATED_TO]->(a:Article)-[s:SOURCE_OF]-(entity)-[entity_rel]-(related_entity)
-WITH entity, entity_rel, related_entity, COUNT(a) AS articleCount
-WHERE articleCount > 3 and type(entity_rel) <> "SOURCE_OF"
-RETURN COLLECT(DISTINCT entity) AS entities, COLLECT(DISTINCT entity_rel) AS rels, COLLECT(DISTINCT related_entity) AS rel_entities"""
+                f"""MATCH (t:Theme {{name: "{theme_title}"}})-[r:RELATED_TO]->(a:Article)-[s:SOURCE_OF]-(entity)
+                    WITH entity, COUNT(a) AS articleCount
+                    WHERE articleCount > 3
+                    with entity
+                    match (a1:Article)-[s1:SOURCE_OF]-(entity)-[entity_rel]-(related_entity)
+                    where type(entity_rel) <> 'SOURCE_OF'
+                    RETURN COLLECT(DISTINCT a1) AS articles, COLLECT(DISTINCT s1) AS source_rels, COLLECT(DISTINCT entity) AS entities, COLLECT(DISTINCT entity_rel) AS rels, COLLECT(DISTINCT related_entity) AS rel_entities"""
             )
         )
 
     def _convert_to_react_flow_format(self, results):
         graph = results[0]
         entities = graph["entities"] + graph["rel_entities"]
+
+        articles = [
+            {
+                "id": article["~id"],
+                "type": "article",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                },
+                "data": article,
+            }
+            for article in graph["articles"]
+        ]
+        unique_articles = set([article["id"] for article in articles])
         nodes = [
             {
                 "id": node["~id"],
@@ -217,9 +233,29 @@ RETURN COLLECT(DISTINCT entity) AS entities, COLLECT(DISTINCT entity_rel) AS rel
                 "data": node,
             }
             for node in entities
+            if node["~id"] not in unique_articles
         ]
         edges = [
-            {"id": rel["~id"], "source": rel["~start"], "target": rel["~end"]}
-            for rel in graph["rels"]
+            {
+                "id": rel["~id"],
+                "type": "source",
+                "source": rel["~start"],
+                "target": rel["~end"],
+                "data": rel,
+            }
+            for rel in graph["source_rels"]
         ]
-        return {"nodes": nodes, "edges": edges}
+        unique_rels = set([edge["id"] for edge in edges])
+        for rel in graph["rels"]:
+            if rel["~id"] not in unique_rels:
+                unique_rels.add(rel["~id"])
+                edges.append(
+                    {
+                        "id": rel["~id"],
+                        "type": "related",
+                        "source": rel["~start"],
+                        "target": rel["~end"],
+                        "data": rel,
+                    }
+                )
+        return {"nodes": nodes + articles, "edges": edges}
