@@ -1,0 +1,10 @@
+tasks:
+  - name: "SetupEditor"
+    command: "./dassie-app-backend/.vscode/extensions.sh"
+    triggerBy:
+      - postEnvironmentStart
+  
+  - name: "SynthStack"
+    command: "cd dassie-app-backend && env LOCAL_TESTING=true cdk synth --no-staging"
+    triggerBy:
+      - postEnvironmentStart
