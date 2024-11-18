@@ -23,10 +23,6 @@ ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
 ApiGatewayStageStackOutput = "ApiStage"
 
-PythonLayerStackOutput = "PythonLayerStackARN"
-PythonLayerStackOutput1 = "PythonLayerStackARN1"
-PythonLayerStackOutput2 = "PythonLayerStackARN2"
-
 
 class PythonStack(Stack):
 
@@ -39,12 +35,6 @@ class PythonStack(Stack):
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
-        reqs_layer, ai_layer, more_ai_layer = self._get_layer_from_arns(
-            dependencies_stack.reqs_layer_arn,
-            dependencies_stack.ai_layer_arn,
-            dependencies_stack.more_ai_layer_arn,
-        )
 
         (
             self.bucket,
@@ -59,7 +49,6 @@ class PythonStack(Stack):
         lambda_function_props = self._get_default_lambda_props(
             infra_stack.lambda_db_access_sg,
             infra_stack.lambda_neptune_access_sg,
-            [reqs_layer, ai_layer, more_ai_layer],
             self.lambdas_env,
             infra_stack.vpc,
         )
@@ -69,11 +58,10 @@ class PythonStack(Stack):
             infra_stack.ddb,
             self.bucket,
             infra_stack.vpc,
-            reqs_layer,
             self.lambdas_env,
         )
 
-        self.archive_navlog = self.create_archive_function(reqs_layer, infra_stack.ddb)
+        self.archive_navlog = self.create_archive_function(infra_stack.ddb)
 
         functions_to_dd_instrument = list(self.functions.values())
         functions_to_dd_instrument.append(self.archive_navlog)
@@ -110,27 +98,6 @@ class PythonStack(Stack):
             value=self.apiGateway.deployment_stage.stage_name,
         )
 
-    def _get_layer_from_arns(
-        self, reqs_layer_arn: str, ai_layer_arn: str, more_ai_layer_arn: str
-    ):
-        # SAM needs the layer arns to be set before run local start-api
-        reqs_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "RequirementsLayer",
-            reqs_layer_arn,
-        )
-        ai_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "AILayer",
-            ai_layer_arn,
-        )
-        more_ai_layer = lambda_.LayerVersion.from_layer_version_arn(
-            self,
-            "MoreAILayer",
-            more_ai_layer_arn,
-        )
-        return reqs_layer, ai_layer, more_ai_layer
-
     def _connect_add_theme_event_bus(self, functions):
         # Create the EventBus
         event_bus = events.EventBus(
@@ -165,13 +132,36 @@ class PythonStack(Stack):
             ],
         )
 
+        events.Rule(
+            self,
+            "AddThemeGraphCompletionRule",
+            event_bus=event_bus,
+            event_pattern=events.EventPattern(
+                source=["dassie.lambda"],
+                detail_type=["Lambda Function Invocation Result"],
+                detail={
+                    "requestContext": {
+                        "functionName": [functions["process_theme"].function_name]
+                    },
+                    "responsePayload": {"statusCode": [200]},
+                },
+            ),
+            targets=[
+                targets.LambdaFunction(
+                    self.functions["process_theme_graph"],
+                    event=events.RuleTargetInput.from_event_path(
+                        "$.detail.responsePayload"
+                    ),
+                )
+            ],
+        )
+
     def _get_lambdas(
         self,
         lambda_function_props,
         ddb,
         bucket,
         vpc,
-        reqs_layer,
         lambdas_env,
     ):
         return {
@@ -203,6 +193,10 @@ class PythonStack(Stack):
                 "process_theme",
                 {**lambda_function_props, "timeout": Duration.minutes(5)},
             ),
+            "process_theme_graph": self.create_lambda_function(
+                "process_theme_graph",
+                {**lambda_function_props, "timeout": Duration.minutes(15)},
+            ),
             "del_theme": self.create_lambda_function(
                 "del_theme",
                 lambda_function_props,
@@ -220,32 +214,80 @@ class PythonStack(Stack):
                 ddb,
                 bucket,
                 vpc,
-                reqs_layer,
             ),
         }
+
+    def create_lambda_function(
+        self,
+        function_name,
+        lambda_function_props,
+    ):
+        lambda_function_props["environment"][
+            "LAMBDA_FUNCTION"
+        ] = f"{function_name.lower()}.lambda_handler"
+        lambda_function = lambda_.DockerImageFunction(
+            self,
+            function_name,
+            code=lambda_.DockerImageCode.from_image_asset(
+                path.join(os.getcwd(), "python"),
+                cmd=[f"{function_name.lower()}.lambda_handler"],
+            ),
+            **lambda_function_props,
+        )
+        return lambda_function
 
     def _get_default_lambda_props(
         self,
         lambda_db_access_sg,
         lambda_neptune_access_sg,
-        reqs_layers,
         lambdas_env,
         vpc,
     ):
         return {
-            "runtime": lambda_.Runtime.PYTHON_3_9,
-            "code": lambda_.AssetCode.from_asset(
-                path.join(os.getcwd(), "python/lambda")
-            ),
             "vpc": vpc,
             "security_groups": [lambda_db_access_sg, lambda_neptune_access_sg],
-            "layers": reqs_layers,
             "architecture": lambda_.Architecture.X86_64,
             "memory_size": 1024,
             "environment": lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,
             "timeout": Duration.seconds(45),
         }
+
+    def create_common_lambda_dependencies(
+        self,
+        sql_db,
+        neptune_endpoint,
+        openai_secret,
+        langfuse_secret,
+        ddb,
+    ):
+        bucket = s3.Bucket(
+            self,
+            "navlog-images",
+            versioned=True,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+        )
+        lambdas_env = {
+            "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
+            "NEPTUNE_ENDPOINT": neptune_endpoint,
+            "DB_SECRET_ARN": sql_db.secret.secret_arn,
+            "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
+            "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
+            "DDB_TABLE": ddb.table_name,
+            "BUCKET_NAME": bucket.bucket_name,
+            "DD_SERVERLESS_LOGS_ENABLED": "true",
+            "DD_TRACE_ENABLED": "true",
+            "DD_LOCAL_TEST": "false",
+            "DD_ENV": "prod",
+            "DD_SERVICE": "dassie-app-backend",
+            "DD_VERSION": "1.0.0",
+            "DSP_CACHEDIR": "/tmp",
+            "DSPY_CACHEDIR": "/tmp",
+        }
+        return (
+            bucket,
+            lambdas_env,
+        )
 
     def instrument_with_datadog(self, functions, datadog_secret):
 
@@ -320,7 +362,7 @@ class PythonStack(Stack):
         )
         return ddb
 
-    def create_archive_function(self, deps_layer, ddb):
+    def create_archive_function(self, ddb):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -350,7 +392,6 @@ class PythonStack(Stack):
             environment={
                 "BUCKET_NAME": archive_bucket.bucket_name,
             },
-            layers=[deps_layer],
             timeout=Duration.minutes(1),
         )
 
@@ -371,40 +412,6 @@ class PythonStack(Stack):
 
         return archive_function
 
-    def create_common_lambda_dependencies(
-        self,
-        sql_db,
-        neptune_endpoint,
-        openai_secret,
-        langfuse_secret,
-        ddb,
-    ):
-        bucket = s3.Bucket(
-            self,
-            "navlog-images",
-            versioned=True,
-            encryption=s3.BucketEncryption.S3_MANAGED,
-        )
-        lambdas_env = {
-            "DB_CLUSTER_ENDPOINT": sql_db.cluster_endpoint.hostname,
-            "NEPTUNE_ENDPOINT": neptune_endpoint,
-            "DB_SECRET_ARN": sql_db.secret.secret_arn,
-            "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
-            "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
-            "DDB_TABLE": ddb.table_name,
-            "BUCKET_NAME": bucket.bucket_name,
-            "DD_SERVERLESS_LOGS_ENABLED": "true",
-            "DD_TRACE_ENABLED": "true",
-            "DD_LOCAL_TEST": "false",
-            "DD_ENV": "prod",
-            "DD_SERVICE": "dassie-app-backend",
-            "DD_VERSION": "1.0.0",
-        }
-        return (
-            bucket,
-            lambdas_env,
-        )
-
     def modify_security_group_for_lambda_access(
         self, functions, sql_db: rds.DatabaseCluster
     ):
@@ -415,35 +422,22 @@ class PythonStack(Stack):
                     function.connections.security_groups[0], ec2.Port.tcp(5432)
                 )
 
-    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc, layer):
-        addNavlog = lambda_.Function(
+    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
+        lambdas_env["LAMBDA_FUNCTION"] = f"add_navlog.lambda_handler"
+        addNavlog = lambda_.DockerImageFunction(
             self,
             "add_navlog",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            handler="add_navlog.lambda_handler",
+            code=lambda_.DockerImageCode.from_image_asset(
+                path.join(os.getcwd(), "python")
+            ),
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),
-            layers=[layer],
             vpc=vpc,
             environment=lambdas_env,
         )
         ddb.grant_read_write_data(addNavlog)
         bucket.grant_read_write(addNavlog)
         return addNavlog
-
-    def create_lambda_function(
-        self,
-        function_name,
-        lambda_function_props,
-    ):
-        lambda_function = lambda_.Function(
-            self,
-            function_name,
-            handler=f"{function_name.lower()}.lambda_handler",
-            **lambda_function_props,
-        )
-        return lambda_function
 
     def _create_auto_scaling_for_lambda(self, name, aliases, functions):
         aliases[name] = functions[name].add_alias("provisioned")

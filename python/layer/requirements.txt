@@ -1,5 +1,8 @@
-psycopg2-binary
-sqlalchemy
-pgvector
-aws-lambda-powertools
-
+aws-lambda-powertools==3.3.0
+greenlet==3.1.1
+jmespath==1.0.1
+numpy==2.0.2
+pgvector==0.3.6
+psycopg2-binary==2.9.10
+SQLAlchemy==2.0.36
+typing_extensions==4.12.2

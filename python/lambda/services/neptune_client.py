@@ -208,6 +208,9 @@ class NeptuneClient:
             )
         )
 
+    def get_article_graph(self, article_id: str):
+        return self.query(f"""MATCH (a:Article {{id: "{article_id}"}}) RETURN a""")
+
     def _convert_to_react_flow_format(self, results):
         graph = results[0]
         entities = graph["entities"] + graph["rel_entities"]

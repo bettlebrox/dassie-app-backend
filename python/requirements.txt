@@ -1,0 +1,9 @@
+dspy-ai
+openai
+tiktoken
+langfuse
+langchain-text-splitters
+psycopg2-binary
+sqlalchemy
+pgvector
+aws-lambda-powertools

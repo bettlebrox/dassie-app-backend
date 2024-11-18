@@ -8,7 +8,7 @@ from langfuse.decorators import observe
 from langfuse.openai import OpenAI
 from dassie_logger import logger
 
-# from services.opencypher_translator import translator
+from services.opencypher_translator import translator
 
 
 class LLMResponseException(Exception):
@@ -131,21 +131,14 @@ class OpenAIClient:
         entities = self.get_completion(
             self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
         )
-        # open_cypher = self.get_completion(
-        #    self.ARTICLE_OPEN_CYPHER_PROMPT.format(article_id=article_id),
-        #    entities + "\n---\n" + article,
-        #    model=model,
-        #    json_response=False,
-        # )
         response = self.translate_to_opencypher(entities, article, article_id)
         return self._get_opencypher_code_block(response)
 
     @observe(as_type=Literal["generation"])
     def translate_to_opencypher(self, entities, article, article_id):
-        return "not implemented"
-        # return translator(
-        #     question=entities + "\n---\n" + article, article_id=article_id
-        # ).response
+        return translator(
+            question=entities + "\n---\n" + article, article_id=article_id
+        ).response
 
     def _get_opencypher_code_block(self, open_cypher):
         code_block = open_cypher.strip()

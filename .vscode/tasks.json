@@ -2,6 +2,16 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Watch SAM",
+            "type": "shell",
+            "command": "nodemon --exec 'sam build -t ${workspaceFolder}/cdk.out/LocalStack.template.json' --ext .py,.json,.yaml,.yml",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            }
+        },
+        {
             "label": "Deploy CDK Stack",
             "type": "shell",
             "command": "cdk deploy --all",

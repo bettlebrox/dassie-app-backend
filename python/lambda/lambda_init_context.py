@@ -51,7 +51,7 @@ class LambdaInitContext:
         self._lang_fuse_secret = lang_fuse_secret
 
     @property
-    def neptune_client(self):
+    def neptune_client(self) -> NeptuneClient:
         if self._neptune_client is None:
             logger.info(
                 "init neptune client",
@@ -64,7 +64,7 @@ class LambdaInitContext:
         return self._neptune_client
 
     @property
-    def boto_event_client(self):
+    def boto_event_client(self) -> boto3.client:
         if self._boto_event_client is None:
             logger.info("init boto event client")
             self._boto_event_client = boto3.client("events")
@@ -72,7 +72,7 @@ class LambdaInitContext:
         return self._boto_event_client
 
     @property
-    def browsed_repo(self):
+    def browsed_repo(self) -> BrowsedRepository:
         if self._browsed_repo is None:
             logger.info("init browsed repo")
             self._browsed_repo = BrowsedRepository(
@@ -83,7 +83,7 @@ class LambdaInitContext:
         return self._browsed_repo
 
     @property
-    def browse_repo(self):
+    def browse_repo(self) -> BrowseRepository:
         if self._browse_repo is None:
             logger.info("init browse repo")
             self._browse_repo = BrowseRepository(
@@ -94,7 +94,7 @@ class LambdaInitContext:
         return self._browse_repo
 
     @property
-    def article_service(self):
+    def article_service(self) -> ArticlesService:
         if self._article_service is None:
             logger.info("init article service")
             self._article_service = ArticlesService(
@@ -108,7 +108,7 @@ class LambdaInitContext:
         return self._article_service
 
     @property
-    def secrets_manager(self):
+    def secrets_manager(self) -> boto3.client:
         if self._secrets_manager is None:
             logger.info("init secrets manager")
             self._secrets_manager = boto3.client("secretsmanager")
@@ -116,7 +116,7 @@ class LambdaInitContext:
         return self._secrets_manager
 
     @property
-    def db_secrets(self):
+    def db_secrets(self) -> tuple[str, str, str]:
         if self._db_secrets is None:
             logger.info(
                 "init db secrets", extra={"db_secret_arn": os.environ["DB_SECRET_ARN"]}
@@ -130,7 +130,7 @@ class LambdaInitContext:
         return self._db_secrets
 
     @property
-    def article_repo(self):
+    def article_repo(self) -> ArticleRepository:
         if self._article_repo is None:
             logger.info("init article repo")
             self._article_repo = ArticleRepository(
@@ -140,12 +140,12 @@ class LambdaInitContext:
         logger.debug("retrieved article repo")
         return self._article_repo
 
-    def _get_secret_string_from_arn(self, arn, key):
+    def _get_secret_string_from_arn(self, arn, key) -> str:
         get_secret_value_response = self.secrets_manager.get_secret_value(SecretId=arn)
         return json.loads(get_secret_value_response["SecretString"])[key]
 
     @property
-    def openai_secret(self):
+    def openai_secret(self) -> str:
         if self._openai_secret is None:
             self._openai_secret = self._get_secret_string_from_arn(
                 os.environ["OPENAIKEY_SECRET_ARN"], self.OPENAI_SECRET_KEY
@@ -153,7 +153,7 @@ class LambdaInitContext:
         return self._openai_secret
 
     @property
-    def lang_fuse_secret(self):
+    def lang_fuse_secret(self) -> str:
         if self._lang_fuse_secret is None:
             self._lang_fuse_secret = self._get_secret_string_from_arn(
                 os.environ["LANGFUSE_SECRET_ARN"], self.LANGFUSE_SECRET_KEY
@@ -161,7 +161,7 @@ class LambdaInitContext:
         return self._lang_fuse_secret
 
     @property
-    def openai_client(self):
+    def openai_client(self) -> OpenAIClient:
         if self._openai_client is None:
             logger.info(
                 "init openai client",
@@ -178,7 +178,7 @@ class LambdaInitContext:
         return self._openai_client
 
     @property
-    def theme_repo(self):
+    def theme_repo(self) -> ThemeRepository:
         if self._theme_repo is None:
             logger.info("init theme repo")
             self._theme_repo = ThemeRepository(
@@ -189,7 +189,7 @@ class LambdaInitContext:
         return self._theme_repo
 
     @property
-    def theme_service(self):
+    def theme_service(self) -> ThemesService:
         if self._theme_service is None:
             logger.info("init theme service")
             self._theme_service = ThemesService(
@@ -199,7 +199,7 @@ class LambdaInitContext:
         return self._theme_service
 
     @property
-    def navlog_service(self):
+    def navlog_service(self) -> NavlogService:
         if self._navlog_service is None:
             logger.info("init navlog service")
             self._navlog_service = NavlogService(
