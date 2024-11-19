@@ -117,14 +117,14 @@ def test_lambda_environment_variables(backend_template):
 
 
 def test_scheduled_event_created(backend_template):
-    backend_template.resource_count_is("AWS::Events::Rule", 3)
+    backend_template.resource_count_is("AWS::Events::Rule", 4)
     backend_template.has_resource_properties(
         "AWS::Events::Rule", {"ScheduleExpression": "cron(27 8-21 * * ? *)"}
     )
 
 
 def test_resources_created(backend_template):
-    backend_template.resource_count_is("AWS::Lambda::Function", 12)
+    backend_template.resource_count_is("AWS::Lambda::Function", 13)
 
     backend_template.resource_count_is("AWS::ApiGateway::RestApi", 1)
 

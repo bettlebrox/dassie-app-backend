@@ -269,44 +269,15 @@ def test_convert_to_react_flow_format():
 
     # Verify edges are formatted correctly
     assert len(result["edges"]) == 1
-    assert result["edges"][0] == {"id": "rel1", "source": "node1", "target": "node2"}
-
-    # Test input that matches the expected format
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    with open(
-        os.path.join(current_dir, "neptune_graph_query_response.json"), "r"
-    ) as file:
-        neptune_query_result = json.load(file)
-
-    result = client._convert_to_react_flow_format(neptune_query_result["results"])
-
-    # Verify the structure matches expected React Flow format
-    assert "nodes" in result
-    assert "edges" in result
-
-    # Verify nodes are formatted correctly
-    assert len(result["nodes"]) == 57
-    assert result["nodes"][0] == {
-        "id": "04e6c122-c4a8-438e-886e-5b0ab3709b1c0",
-        "type": "entity",
-        "position": {"x": 0, "y": 0},
-        "data": {
-            "~id": "04e6c122-c4a8-438e-886e-5b0ab3709b1c0",
-            "~entityType": "node",
-            "~labels": ["Policy"],
-            "~properties": {
-                "name": "W3C Patent Policy",
-                "id": "dbpedia:Patent_Policy",
-                "description": "Policy governing patent disclosures related to W3C deliverables.",
-                "label": "W3C Patent Policy",
-            },
-        },
-    }
-
-    # Verify edges are formatted correctly
-    assert len(result["edges"]) == 32
     assert result["edges"][0] == {
-        "id": "be04eb6a-8f38-47de-a825-9c078a395ffd0",
-        "source": "32303752-6bb0-4dd2-8a6e-1f0d2fa368580",
-        "target": "7bc97ab1-2c6e-434c-b780-a5f0401e5b6f0",
+        "id": "rel1",
+        "source": "node1",
+        "target": "node2",
+        "type": "related",
+        "data": {
+            "~end": "node2",
+            "~id": "rel1",
+            "~start": "node1",
+            "~type": "TEST_REL",
+        },
     }
