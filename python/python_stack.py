@@ -1,6 +1,7 @@
 import json
 from os import path
 import os
+import subprocess
 from aws_cdk import Stack, CfnOutput, Duration, TimeZone
 from constructs import Construct
 import aws_cdk.aws_lambda as lambda_
@@ -13,7 +14,6 @@ import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
 
 import aws_cdk.aws_iam as iam
-import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
 from infra_stack import InfraStack
@@ -44,6 +44,7 @@ class PythonStack(Stack):
             "https://dassie.cluster-c9w86oa4s60z.eu-west-1.neptune.amazonaws.com:8182",
             dependencies_stack.openai_secret,
             dependencies_stack.langfuse_secret,
+            dependencies_stack.datadog_secret,
             infra_stack.ddb,
         )
         lambda_function_props = self._get_default_lambda_props(
@@ -61,12 +62,8 @@ class PythonStack(Stack):
             self.lambdas_env,
         )
 
-        self.archive_navlog = self.create_archive_function(infra_stack.ddb)
-
-        functions_to_dd_instrument = list(self.functions.values())
-        functions_to_dd_instrument.append(self.archive_navlog)
-        self.instrument_with_datadog(
-            functions_to_dd_instrument, dependencies_stack.datadog_secret
+        self.archive_navlog = self.create_archive_function(
+            infra_stack.ddb, self.lambdas_env
         )
 
         self.create_scheduled_event_for_function("build_articles", self.functions, "27")
@@ -223,14 +220,14 @@ class PythonStack(Stack):
         lambda_function_props,
     ):
         lambda_function_props["environment"][
-            "LAMBDA_FUNCTION"
+            "DD_LAMBDA_HANDLER"
         ] = f"{function_name.lower()}.lambda_handler"
         lambda_function = lambda_.DockerImageFunction(
             self,
             function_name,
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
-                cmd=[f"{function_name.lower()}.lambda_handler"],
+                cmd=["datadog_lambda.handler.handler"],
             ),
             **lambda_function_props,
         )
@@ -259,6 +256,7 @@ class PythonStack(Stack):
         neptune_endpoint,
         openai_secret,
         langfuse_secret,
+        datadog_secret,
         ddb,
     ):
         bucket = s3.Bucket(
@@ -273,45 +271,39 @@ class PythonStack(Stack):
             "DB_SECRET_ARN": sql_db.secret.secret_arn,
             "OPENAIKEY_SECRET_ARN": openai_secret.secret_arn,
             "LANGFUSE_SECRET_ARN": langfuse_secret.secret_arn,
+            "DD_API_KEY_SECRET_ARN": datadog_secret.secret_arn,
             "DDB_TABLE": ddb.table_name,
             "BUCKET_NAME": bucket.bucket_name,
             "DD_SERVERLESS_LOGS_ENABLED": "true",
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
             "DD_ENV": "prod",
-            "DD_SERVICE": "dassie-app-backend",
             "DD_VERSION": "1.0.0",
+            "DD_LOG_LEVEL": "INFO",
             "DSP_CACHEDIR": "/tmp",
             "DSPY_CACHEDIR": "/tmp",
+            "JOBLIB_MULTIPROCESSING": "0",
+            "DD_SITE": "datadoghq.eu",
+            "DD_SERVICE": "dassie-app-backend",
+            "DD_GIT_COMMIT_SHA": subprocess.check_output(["git", "rev-parse", "HEAD"])
+            .decode("ascii")
+            .strip(),
+            "DD_GIT_REPOSITORY_URL": "github.com/bettlebrox/dassie-app-backend.git",
         }
         return (
             bucket,
             lambdas_env,
         )
 
-    def instrument_with_datadog(self, functions, datadog_secret):
-
-        datadog_ext = datadog.Datadog(
-            self,
-            "datadog",
-            api_key_secret=datadog_secret,
-            site="datadoghq.eu",
-            python_layer_version=98,
-            extension_layer_version=64,
-            enable_profiling=True,
-        )
-        datadog_ext.add_lambda_functions(functions)
-        for f in functions:
-            datadog_secret.grant_read(f)
-
     def grant_lambda_permissions(
-        self, lambda_function, sql_db, openai_secret, langfuse_secret
+        self, lambda_function, sql_db, openai_secret, langfuse_secret, datadog_secret
     ):
         sql_db.grant_data_api_access(lambda_function)
         sql_db.connections.allow_default_port_from(lambda_function)
         sql_db.secret.grant_read(lambda_function)
         openai_secret.grant_read(lambda_function)
         langfuse_secret.grant_read(lambda_function)
+        datadog_secret.grant_read(lambda_function)
 
     def create_postgres_database(self, vpc, bastion, snapshot_id=None):
         common_params = {
@@ -362,7 +354,7 @@ class PythonStack(Stack):
         )
         return ddb
 
-    def create_archive_function(self, ddb):
+    def create_archive_function(self, ddb, lambdas_env):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -382,16 +374,15 @@ class PythonStack(Stack):
         )
 
         # Create a Lambda function to archive deleted items
-        archive_function = lambda_.Function(
+        lambdas_env["BUCKET_NAME"] = archive_bucket.bucket_name
+        archive_function = lambda_.DockerImageFunction(
             self,
-            "ArchiveFunction",
-            runtime=lambda_.Runtime.PYTHON_3_9,
-            handler="archive_navlog.lambda_handler",
-            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            architecture=lambda_.Architecture.ARM_64,
-            environment={
-                "BUCKET_NAME": archive_bucket.bucket_name,
-            },
+            "ArchiveFunction_new",
+            code=lambda_.DockerImageCode.from_image_asset(
+                path.join(os.getcwd(), "python"),
+                cmd=["archive_navlog.lambda_handler"],
+            ),
+            environment=lambdas_env,
             timeout=Duration.minutes(1),
         )
 
@@ -423,12 +414,12 @@ class PythonStack(Stack):
                 )
 
     def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
-        lambdas_env["LAMBDA_FUNCTION"] = f"add_navlog.lambda_handler"
         addNavlog = lambda_.DockerImageFunction(
             self,
-            "add_navlog",
+            "add_navlog_new",
             code=lambda_.DockerImageCode.from_image_asset(
-                path.join(os.getcwd(), "python")
+                path.join(os.getcwd(), "python"),
+                cmd=[f"add_navlog.lambda_handler"],
             ),
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),

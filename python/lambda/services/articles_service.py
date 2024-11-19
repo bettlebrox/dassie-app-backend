@@ -75,7 +75,7 @@ class ArticlesService:
         themes = []
         themes = [
             theme.original_title
-            for theme in self._theme_repo.get(filter_embedding=embedding, limit=3)
+            for theme, _ in self._theme_repo.get(filter_embedding=embedding, limit=3)
         ]
         if (
             "themes" in article_summary

@@ -7,3 +7,4 @@ psycopg2-binary
 sqlalchemy
 pgvector
 aws-lambda-powertools
+datadog-lambda

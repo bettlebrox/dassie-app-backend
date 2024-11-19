@@ -5,6 +5,7 @@ import pytest
 from theme_repo import ThemeRepository
 from models.models import Association
 from models.article import Article
+from models.browse import Browse
 from models.theme import Theme, ThemeType
 
 
@@ -24,6 +25,13 @@ def mock_query(repo: ThemeRepository) -> Any:
 def get_top_mock_query(mock_query: Any) -> Any:
     return (
         mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit
+    )
+
+
+@pytest.fixture
+def get_filter_embedding_mock_query(mock_query: Any) -> Any:
+    return (
+        mock_query.join.return_value.group_by.return_value.where.return_value.having.return_value.order_by.return_value.limit
     )
 
 
@@ -336,3 +344,16 @@ def test_get_top_themes_without_source_type(
     mock_query.join.return_value.group_by.return_value.having.return_value.order_by.return_value.limit.assert_called_once_with(
         2
     )
+
+
+def test_get_query_with_embedding(
+    repo: ThemeRepository, get_filter_embedding_mock_query: Any
+):
+    get_filter_embedding_mock_query.return_value = [
+        (Theme(original_title="Test Theme"), 0.9)
+    ]
+    result = repo.get(filter_embedding=[0.1, 0.2, 0.3])
+
+    (result_theme, result_score) = result[0]
+    assert result_theme.original_title == "Test Theme"
+    assert result_score == 0.9

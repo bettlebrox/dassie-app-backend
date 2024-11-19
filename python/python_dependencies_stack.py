@@ -1,10 +1,6 @@
-from aws_cdk import CfnOutput, Stack
+from aws_cdk import Stack
 from constructs import Construct
-import aws_cdk.aws_lambda as lambda_
-import aws_cdk.aws_lambda_python_alpha as lambda_python
 import aws_cdk.aws_secretsmanager as secretsmanager  # Import the secretsmanager module
-
-from aws_cdk import RemovalPolicy
 
 
 class PythonDependenciesStack(Stack):
@@ -16,24 +12,6 @@ class PythonDependenciesStack(Stack):
 
         self.openai_secret, self.langfuse_secret, self.datadog_secret = (
             self._create_secrets()
-        )
-        CfnOutput(
-            self,
-            "ReqsLayerOutput",
-            value="1",
-            export_name="ReqsLayer",
-        )
-        CfnOutput(
-            self,
-            "AILayerOutput",
-            value="2",
-            export_name="AILayer",
-        )
-        CfnOutput(
-            self,
-            "MoreAILayerOutput",
-            value="3",
-            export_name="MoreAILayer",
         )
 
     def _create_secrets(self):
