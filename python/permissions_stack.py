@@ -35,6 +35,7 @@ class PermissionsStack(Stack):
                 infra_stack.sql_db,
                 dependencies_stack.openai_secret,
                 dependencies_stack.langfuse_secret,
+                dependencies_stack.datadog_secret,
             )
         for function in python_stack.functions.values():
             if function.is_bound_to_vpc:
@@ -43,6 +44,7 @@ class PermissionsStack(Stack):
                     infra_stack.sql_db,
                     dependencies_stack.openai_secret,
                     dependencies_stack.langfuse_secret,
+                    dependencies_stack.datadog_secret,
                 )
             else:
                 raise ValueError(
@@ -55,8 +57,10 @@ class PermissionsStack(Stack):
         sql_db,
         openai_secret,
         langfuse_secret,
+        datadog_secret,
     ):
         sql_db.grant_data_api_access(principle)
         sql_db.secret.grant_read(principle)
         openai_secret.grant_read(principle)
         langfuse_secret.grant_read(principle)
+        datadog_secret.grant_read(principle)

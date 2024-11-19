@@ -278,8 +278,8 @@ class PythonStack(Stack):
             "DD_TRACE_ENABLED": "true",
             "DD_LOCAL_TEST": "false",
             "DD_ENV": "prod",
-            "DD_VERSION": "1.0.0",
-            "DD_LOG_LEVEL": "INFO",
+            "DD_VERSION": f"1.0.{subprocess.check_output(['git', 'rev-list', '--count', 'HEAD']).decode('ascii').strip()}",
+            "DD_LOG_LEVEL": "ERROR",
             "DSP_CACHEDIR": "/tmp",
             "DSPY_CACHEDIR": "/tmp",
             "JOBLIB_MULTIPROCESSING": "0",
@@ -294,16 +294,6 @@ class PythonStack(Stack):
             bucket,
             lambdas_env,
         )
-
-    def grant_lambda_permissions(
-        self, lambda_function, sql_db, openai_secret, langfuse_secret, datadog_secret
-    ):
-        sql_db.grant_data_api_access(lambda_function)
-        sql_db.connections.allow_default_port_from(lambda_function)
-        sql_db.secret.grant_read(lambda_function)
-        openai_secret.grant_read(lambda_function)
-        langfuse_secret.grant_read(lambda_function)
-        datadog_secret.grant_read(lambda_function)
 
     def create_postgres_database(self, vpc, bastion, snapshot_id=None):
         common_params = {
@@ -375,12 +365,13 @@ class PythonStack(Stack):
 
         # Create a Lambda function to archive deleted items
         lambdas_env["BUCKET_NAME"] = archive_bucket.bucket_name
+        lambdas_env["DD_LAMBDA_HANDLER"] = "archive_navlog.lambda_handler"
         archive_function = lambda_.DockerImageFunction(
             self,
-            "ArchiveFunction_new",
+            "ArchiveFunction",
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
-                cmd=["archive_navlog.lambda_handler"],
+                cmd=["datadog_lambda.handler.handler"],
             ),
             environment=lambdas_env,
             timeout=Duration.minutes(1),
@@ -414,12 +405,13 @@ class PythonStack(Stack):
                 )
 
     def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
+        lambdas_env["DD_LAMBDA_HANDLER"] = "add_navlog.lambda_handler"
         addNavlog = lambda_.DockerImageFunction(
             self,
-            "add_navlog_new",
+            "add_navlog",
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
-                cmd=[f"add_navlog.lambda_handler"],
+                cmd=["datadog_lambda.handler.handler"],
             ),
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),
