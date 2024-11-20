@@ -3,6 +3,10 @@ from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
 from dassie_logger import logger
 from langfuse.decorators import observe
+from langfuse.decorators import langfuse_context
+from models.article import Article
+from services.neptune_client import NeptuneClient
+from services.openai_client import OpenAIClient
 
 init_context = None
 
@@ -17,6 +21,7 @@ def lambda_handler(
     openai_client=None,
     theme_service=None,
     neptune_client=None,
+    openai_secret=None,
     useGlobal=True,
 ):
     try:
@@ -29,11 +34,14 @@ def lambda_handler(
                 openai_client=openai_client,
                 theme_service=theme_service,
                 neptune_client=neptune_client,
+                openai_secret=openai_secret,
             )
         article_repo = init_context.article_repo
         openai_client = init_context.openai_client
         theme_service = init_context.theme_service
         neptune_client = init_context.neptune_client
+        openai_secret = init_context.openai_secret
+        logger.info(f"openai_secret", extra={"openai_secret": openai_secret})
         payload = json.loads(event["body"])
         title = payload["title"]
         logger.info(f"Retrieving theme {title}")
@@ -60,10 +68,10 @@ def lambda_handler(
                 )
                 graph = neptune_client.get_article_graph(article.id)
                 if graph is not []:
-                    graph = process_theme(article, openai_client, neptune_client)
+                    graph = process_theme_graph(article, openai_client, neptune_client)
                     processed_articles += 1
         except Exception as error:
-            logger.exception("Error in process_theme_graph")
+            logger.exception("Error processing article graphs for theme")
             errors += 1
 
         response["body"] = json.dumps(
@@ -81,8 +89,12 @@ def lambda_handler(
         return response
 
 
-@observe(name="process_theme")
-def process_theme(article, openai_client, neptune_client):
-    graph = openai_client.get_article_graph(article.text, article.id)
-    neptune_client.upsert_article_graph(graph)
+@observe(name="process_theme_graph")
+def process_theme_graph(
+    article: Article, openai_client: OpenAIClient, neptune_client: NeptuneClient
+):
+    graph = openai_client.generate_article_graph(article.text, article.id)
+    neptune_client.upsert_article_graph(
+        article, graph, langfuse_context.get_current_trace_id()
+    )
     return graph

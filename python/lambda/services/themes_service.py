@@ -26,7 +26,7 @@ class ThemesService:
             },
         )
 
-    def add_theme(self, theme):
+    def add_theme(self, theme) -> Theme:
         theme = self.theme_repo.upsert(theme)
         return theme
 

@@ -16,6 +16,7 @@ def lambda_handler(
     article_repo=None,
     openai_client=None,
     theme_service=None,
+    boto_event_client=None,
     useGlobal=True,
 ):
     try:
@@ -27,11 +28,12 @@ def lambda_handler(
                 article_repo=article_repo,
                 openai_client=openai_client,
                 theme_service=theme_service,
+                boto_event_client=boto_event_client,
             )
         article_repo = init_context.article_repo
         openai_client = init_context.openai_client
         theme_service = init_context.theme_service
-
+        boto_event_client = init_context.boto_event_client
         payload = json.loads(event["body"])
         title = payload["title"]
         logger.info(f"Retrieving theme {title}")
@@ -54,6 +56,23 @@ def lambda_handler(
             return response
 
         response["body"] = processed_theme.json()
+        event_detail = {
+            "requestContext": {
+                "functionName": context.function_name,
+                "functionVersion": context.function_version,
+            },
+            "responsePayload": response,
+        }
+        boto_event_client.put_events(
+            Entries=[
+                {
+                    "Source": "dassie.lambda",
+                    "DetailType": "Lambda Function Invocation Result",
+                    "Detail": json.dumps(event_detail),
+                    "EventBusName": "dassie-async-events",
+                }
+            ]
+        )
         return response
 
     except Exception as error:

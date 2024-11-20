@@ -104,7 +104,7 @@ class PythonStack(Stack):
         )
         # Grant permission to add_theme function to put events to the EventBus
         event_bus.grant_put_events_to(functions["add_theme"])
-
+        event_bus.grant_put_events_to(functions["process_theme"])
         events.Rule(
             self,
             "AddThemeCompletionRule",

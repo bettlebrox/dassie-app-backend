@@ -6,7 +6,6 @@ from models.article import Article
 from models.theme import Theme
 from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
-import random
 
 
 class NeptuneClient:
@@ -16,10 +15,10 @@ class NeptuneClient:
         self._endpoint = endpoint
         if session is None:
             session = boto3.Session()
-        self.client = session.client("neptunedata", endpoint_url=endpoint, verify=False)
+        self.client = session.client("neptunedata", endpoint_url=endpoint)
         release = "dev"
         try:
-            release = os.environ["DD_TAGS"]
+            release = os.environ["DD_VERSION"]
         except KeyError:
             pass
         langfuse_context.configure(
@@ -210,6 +209,14 @@ class NeptuneClient:
 
     def get_article_graph(self, article_id: str):
         return self.query(f"""MATCH (a:Article {{id: "{article_id}"}}) RETURN a""")
+
+    def delete_article_graph(self, article_id: str):
+        self.query(
+            f"""MATCH (a:Article {{id: "{article_id}"}})-[:SOURCE_OF]-(b) DETACH DELETE b"""
+        )
+        return self.query(
+            f"""MATCH (a:Article {{id: "{article_id}"}}) DETACH DELETE a"""
+        )
 
     def _convert_to_react_flow_format(self, results):
         graph = results[0]

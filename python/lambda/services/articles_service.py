@@ -2,11 +2,13 @@ from datetime import datetime, timedelta
 from article_repo import ArticleRepository
 from browse_repo import BrowseRepository
 from dassie_logger import logger
-
+from langfuse.decorators import observe
+from langfuse.decorators import langfuse_context
 from models.browse import Browse
 from models.models import Browsed
 from models.article import Article
 from repos import BrowsedRepository
+from services.neptune_client import NeptuneClient
 from services.openai_client import OpenAIClient
 from theme_repo import ThemeRepository
 
@@ -22,12 +24,14 @@ class ArticlesService:
         browse_repo: BrowseRepository,
         browsed_repo: BrowsedRepository,
         openai_client: OpenAIClient,
+        neptune_client: NeptuneClient,
     ):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
         self._browse_repo = browse_repo
         self._browsed_repo = browsed_repo
         self._llm_client = openai_client
+        self._neptune_client = neptune_client
 
     def process_navlog(self, navlog):
         article = self._article_repo.get_or_insert(
@@ -82,14 +86,33 @@ class ArticlesService:
             and article_summary["themes"] is not None
             and len(themes) < 3
         ):
-            themes = list(set(article_summary["themes"]) + set(themes))
-        if themes.sorted() != current_article.themes.sorted():
+            themes = list(set(article_summary["themes"]).union(set(themes)))
+        if sorted(themes) != sorted(current_article.themes):
             self._theme_repo.add_related(current_article, themes)
 
     def get_search_terms_from_article(self, article):
         if article.original_title.endswith("- Google Search"):
             return article.original_title.split("- Google Search")[0].strip()
         return None
+
+    @observe(name="process_article_graph")
+    def _process_article_graph(self, article: Article):
+        logger.info("Processing article graph", extra={"article": article.id})
+        current_graph = self._neptune_client.get_article_graph(article.id)
+        if current_graph != [] and article.updated_at > datetime.now() - timedelta(
+            days=self.STALE_ARTICLE_THRESHOLD
+        ):
+            logger.info("Article graph already exists", extra={"article": article.id})
+            return current_graph
+        graph_opencypher = self._llm_client.generate_article_graph(
+            article.text, article.id
+        )
+        if graph_opencypher is None:
+            return None
+        self._neptune_client.upsert_article_graph(
+            article, graph_opencypher, langfuse_context.get_current_trace_id()
+        )
+        return graph_opencypher
 
     def _track_browsing(self, article, navlog):
         search = self.get_search_terms_from_article(article)

@@ -6,6 +6,7 @@ import tiktoken
 from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
 from langfuse.openai import OpenAI
+
 from dassie_logger import logger
 
 from services.opencypher_translator import translator
@@ -52,7 +53,7 @@ class OpenAIClient:
         self.openai_client = OpenAI(api_key=api_key)
         release = "dev"
         try:
-            release = os.environ["DD_TAGS"]
+            release = os.environ["DD_VERSION"]
         except KeyError:
             pass
         langfuse_context.configure(
@@ -121,7 +122,7 @@ class OpenAIClient:
         return None
 
     @observe()
-    def get_article_graph(self, article, article_id, model="gpt-4o-mini"):
+    def generate_article_graph(self, article, article_id, model="gpt-4o-mini"):
         langfuse_context.update_current_trace(
             input={"article_id": article_id},
         )

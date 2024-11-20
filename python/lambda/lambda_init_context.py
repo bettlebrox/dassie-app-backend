@@ -103,6 +103,7 @@ class LambdaInitContext:
                 self.browse_repo,
                 self.browsed_repo,
                 self.openai_client,
+                self.neptune_client,
             )
         logger.debug("retrieved article service")
         return self._article_service
@@ -150,6 +151,8 @@ class LambdaInitContext:
             self._openai_secret = self._get_secret_string_from_arn(
                 os.environ["OPENAIKEY_SECRET_ARN"], self.OPENAI_SECRET_KEY
             )
+            # shouldn't be set as env variable but needed by langfuse/openai integration
+            os.environ["OPENAI_API_KEY"] = self._openai_secret
         return self._openai_secret
 
     @property

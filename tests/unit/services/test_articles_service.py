@@ -1,19 +1,60 @@
-from unittest.mock import MagicMock
+from datetime import datetime, timedelta
+from unittest.mock import ANY, MagicMock
+
+import pytest
 from models.browse import Browse
 from services.articles_service import ArticlesService
 from models.article import Article
 from models.theme import Theme
 
 
-def test_build_article():
-    articles_repo = MagicMock()
-    themes_repo = MagicMock()
-    browse_repo = MagicMock()
-    browsed_repo = MagicMock()
-    llm_client = MagicMock()
-    articles_service = ArticlesService(
-        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
+@pytest.fixture
+def articles_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def themes_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def browse_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def browsed_repo():
+    return MagicMock()
+
+
+@pytest.fixture
+def llm_client():
+    return MagicMock()
+
+
+@pytest.fixture
+def neptune_client():
+    return MagicMock()
+
+
+@pytest.fixture
+def articles_service(
+    articles_repo, themes_repo, browse_repo, browsed_repo, llm_client, neptune_client
+):
+    return ArticlesService(
+        articles_repo,
+        themes_repo,
+        browse_repo,
+        browsed_repo,
+        llm_client,
+        neptune_client,
     )
+
+
+def test_build_article(
+    articles_service, articles_repo, themes_repo, browse_repo, browsed_repo
+):
     navlog = {
         "id": "1",
         "title": "Navlog 1",
@@ -41,15 +82,9 @@ def test_build_article():
     browsed_repo.add.assert_called_once()
 
 
-def test_build_article_from_navlog_without_existing_article():
-    articles_repo = MagicMock()
-    themes_repo = MagicMock()
-    browse_repo = MagicMock()
-    browsed_repo = MagicMock()
-    llm_client = MagicMock()
-    articles_service = ArticlesService(
-        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
-    )
+def test_build_article_from_navlog_without_existing_article(
+    articles_service, articles_repo
+):
     navlog = {
         "id": "2",
         "title": "Navlog 2",
@@ -64,15 +99,9 @@ def test_build_article_from_navlog_without_existing_article():
     assert articles_repo.update.calledWith(new_article)
 
 
-def test_track_browsing_with_existing_browsed():
-    articles_repo = MagicMock()
-    themes_repo = MagicMock()
-    browse_repo = MagicMock()
-    browsed_repo = MagicMock()
-    llm_client = MagicMock()
-    articles_service = ArticlesService(
-        articles_repo, themes_repo, browse_repo, browsed_repo, llm_client
-    )
+def test_track_browsing_with_existing_browsed(
+    articles_service, browse_repo, browsed_repo
+):
     article = Article(original_title="Test Article 2", url="https://example.org")
     article._id = 2
     navlog = {
@@ -94,3 +123,156 @@ def test_track_browsing_with_existing_browsed():
     browse_repo.get_or_insert.assert_called_once()
     browsed_repo.get_by_browse_and_article.assert_called_once()
     browsed_repo.update.assert_called_once()
+
+
+def test_add_llm_summarisation(articles_service, articles_repo, themes_repo):
+    article = Article(original_title="Test Article", url="https://example.com")
+    article._id = 1
+
+    article_summary = {"summary": "Test summary", "themes": ["theme1", "theme2"]}
+    embedding = [0.1, 0.2, 0.3]
+    token_count = 100
+
+    # Mock theme repo get method to return empty list
+    themes_repo.get.return_value = []
+
+    articles_service._add_llm_summarisation(
+        article, article_summary, embedding, token_count
+    )
+
+    # Verify article was updated with summary and metadata
+    assert article.summary == "Test summary"
+    assert article.embedding == embedding
+    assert article.token_count == token_count
+    assert isinstance(article.updated_at, datetime)
+
+    # Verify article was updated in repo
+    articles_repo.update.assert_called_once_with(article)
+
+    # Verify themes were added
+    themes_repo.add_related.assert_called_once()
+    call_args = themes_repo.add_related.call_args[0]
+    assert call_args[0] == article
+    assert set(call_args[1]) == {"theme1", "theme2"}
+
+
+def test_process_article_graph(articles_service, neptune_client, llm_client):
+    article = Article(
+        original_title="Test Article",
+        url="https://example.com",
+    )
+    article._updated_at = datetime.now() - timedelta(days=2)
+    article._id = 1
+    neptune_client.get_article_graph.return_value = []
+    graph_opencypher = """
+    merge (e:Entity {name: "entity1"})
+    merge (a:Article {id: 1})-[:SOURCE_OF]->(e)
+    """
+    llm_client.generate_article_graph.return_value = graph_opencypher
+    graph = articles_service._process_article_graph(article)
+    neptune_client.upsert_article_graph.assert_called_once_with(
+        article, graph_opencypher, ANY
+    )
+    assert graph != []
+
+
+def test_process_article_graph_with_existing_graph(articles_service, neptune_client):
+    article = Article(
+        original_title="Test Article",
+        url="https://example.com",
+    )
+    article._updated_at = datetime.now()
+    article._id = 1
+
+    existing_graph = """
+    MERGE (e:Entity {name: "existing"})
+    MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
+    """
+    neptune_client.get_article_graph.return_value = existing_graph
+
+    graph = articles_service._process_article_graph(article)
+
+    # Should return existing graph without regenerating
+    llm_client.generate_article_graph.assert_not_called()
+    neptune_client.upsert_article_graph.assert_not_called()
+    assert graph == existing_graph
+
+
+def test_process_article_graph_with_stale_graph(articles_service, neptune_client):
+    article = Article(
+        original_title="Test Article",
+        url="https://example.com",
+    )
+    # Set updated_at to over 90 days ago
+    article._updated_at = datetime.now() - timedelta(days=91)
+    article._id = 1
+
+    existing_graph = """
+    MERGE (e:Entity {name: "old"})
+    MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
+    """
+    new_graph = """
+    MERGE (e:Entity {name: "new"})
+    MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
+    """
+    neptune_client.get_article_graph.return_value = existing_graph
+    llm_client.generate_article_graph.return_value = new_graph
+
+    graph = articles_service._process_article_graph(article)
+
+    # Should regenerate graph since existing one is stale
+    llm_client.generate_article_graph.assert_called_once()
+    neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
+    assert graph == new_graph
+
+
+def test_process_article_graph_with_empty_graph(articles_service, neptune_client):
+    article = Article(
+        original_title="Test Article",
+        url="https://example.com",
+    )
+    article._updated_at = datetime.now()
+    article._id = 1
+
+    neptune_client.get_article_graph.return_value = []
+    new_graph = """
+    MERGE (e:Entity {name: "new"})
+    MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
+    """
+    llm_client.generate_article_graph.return_value = new_graph
+
+    graph = articles_service._process_article_graph(article)
+
+    # Should generate new graph since none exists
+    llm_client.generate_article_graph.assert_called_once()
+    neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
+    assert graph == new_graph
+
+
+def test_add_llm_summarisation_with_existing_themes(
+    articles_service, articles_repo, themes_repo
+):
+    article = Article(original_title="Test Article", url="https://example.com")
+    article._id = 1
+
+    article_summary = {"summary": "Test summary", "themes": ["theme1", "theme2"]}
+    embedding = [0.1, 0.2, 0.3]
+    token_count = 100
+
+    # Test with existing themes from embedding
+    themes_repo.get.return_value = [(Theme("theme3"), 0.9), (Theme("theme4"), 0.8)]
+    articles_service._add_llm_summarisation(
+        article, article_summary, embedding, token_count
+    )
+
+    # Verify themes were merged and duplicates removed
+    themes_repo.add_related.assert_called_once()
+    # Check if the call contains the expected themes regardless of order
+    call_args = themes_repo.add_related.call_args[0][
+        1
+    ]  # Get the second argument from the call
+    assert set(call_args) == set(["theme1", "theme2", "Theme4", "Theme3"])
+
+    # Test with None summary
+    articles_service._add_llm_summarisation(article, None, embedding, token_count)
+    assert articles_repo.update.call_count == 1  # No additional updated
