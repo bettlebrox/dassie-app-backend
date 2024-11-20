@@ -17,7 +17,7 @@ def test_neptune_client_initialization(mock_session):
 
     assert client._endpoint == "https://test-endpoint:8182"
     mock_session.return_value.client.assert_called_once_with(
-        "neptunedata", endpoint_url="https://test-endpoint:8182", verify=False
+        "neptunedata", endpoint_url="https://test-endpoint:8182"
     )
 
 
