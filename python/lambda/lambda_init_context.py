@@ -75,7 +75,6 @@ class LambdaInitContext:
             )
             self._neptune_client = NeptuneClient(
                 os.getenv("NEPTUNE_ENDPOINT"),
-                self.lang_fuse_secret,
             )
         return self._neptune_client
 

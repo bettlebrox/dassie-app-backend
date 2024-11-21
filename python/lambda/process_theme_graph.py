@@ -2,11 +2,6 @@ import json
 from aws_lambda_powertools.logging import correlation_paths
 from lambda_init_context import LambdaInitContext
 from dassie_logger import logger
-from langfuse.decorators import observe
-from langfuse.decorators import langfuse_context
-from models.article import Article
-from services.neptune_client import NeptuneClient
-from services.openai_client import OpenAIClient
 
 init_context = None
 
@@ -66,10 +61,7 @@ def lambda_handler(
                 logger.debug(
                     "processing theme article", extra={"article": article.title}
                 )
-                graph = neptune_client.get_article_graph(article.id)
-                if graph is not []:
-                    graph = process_theme_graph(article, openai_client, neptune_client)
-                    processed_articles += 1
+                neptune_client.upsert_theme_graph(theme)
         except Exception as error:
             logger.exception("Error processing article graphs for theme")
             errors += 1
@@ -87,14 +79,3 @@ def lambda_handler(
         response["statusCode"] = 500
         response["body"] = json.dumps({"message": str(error)})
         return response
-
-
-@observe(name="process_theme_graph")
-def process_theme_graph(
-    article: Article, openai_client: OpenAIClient, neptune_client: NeptuneClient
-):
-    graph = openai_client.generate_article_graph(article.text, article.id)
-    neptune_client.upsert_article_graph(
-        article, graph, langfuse_context.get_current_trace_id()
-    )
-    return graph

@@ -4,6 +4,7 @@ from dassie_logger import logger
 from models.article import Article
 from models.theme import Theme
 from langfuse.decorators import observe
+from langfuse.decorators import langfuse_context
 
 
 class NeptuneClient:
@@ -99,7 +100,9 @@ class NeptuneClient:
         """
         return query
 
-    def _upsert_theme(self, theme: Theme, trace_id: str):
+    @observe()
+    def upsert_theme_graph(self, theme: Theme):
+        trace_id = langfuse_context.get_current_trace_id()
         query = f"""
         merge (t:Theme {{id: "{theme.id}"}})
         on create set t.domain = "dassie_browse", t.source = "{theme.source}", t.created_at = "{theme.created_at}", t.name = "{theme.original_title}", t.title = "{theme.title}", t.trace_id = "{trace_id}"
