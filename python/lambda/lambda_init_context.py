@@ -73,9 +73,7 @@ class LambdaInitContext:
                 "init neptune client",
                 extra={"neptune_endpoint": os.getenv("NEPTUNE_ENDPOINT")},
             )
-            self._neptune_client = NeptuneClient(
-                os.getenv("NEPTUNE_ENDPOINT"),
-            )
+            self._neptune_client = NeptuneClient(os.getenv("NEPTUNE_ENDPOINT"))
         return self._neptune_client
 
     @property

@@ -8,7 +8,7 @@ init_context = None
 @logger.inject_lambda_context(
     correlation_id_path=correlation_paths.API_GATEWAY_REST, log_event=True
 )
-def lambda_handler(event, context, theme_repo=None, useGlobal=False):
+def lambda_handler(event, context, theme_repo=None, useGlobal=True):
     logger.debug("del_related")
     response = {"statusCode": 204, "headers": {"Access-Control-Allow-Origin": "*"}}
     global init_context

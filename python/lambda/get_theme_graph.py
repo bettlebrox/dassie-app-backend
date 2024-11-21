@@ -8,7 +8,7 @@ init_context = None
 
 
 @logger.inject_lambda_context(correlation_id_path=correlation_paths.API_GATEWAY_REST)
-def lambda_handler(event, context, neptune_client=None, useGlobal=False):
+def lambda_handler(event, context, neptune_client=None, useGlobal=True):
     logger.debug("begin lambda_handler")
     response = {
         "statusCode": 200,
