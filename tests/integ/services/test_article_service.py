@@ -7,9 +7,10 @@ from lambda_init_context import LambdaInitContext
 from dotenv import load_dotenv
 from langfuse.decorators import observe
 from langfuse.decorators import langfuse_context
-from services.articles_service import ArticlesService
+from tests.integ.test_integration import GITHUB_ACTIONS
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 @pytest.fixture
 def init_context() -> LambdaInitContext:
     assert load_dotenv("tests/integ/lambda/local.env")
