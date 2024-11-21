@@ -56,6 +56,7 @@ class ArticlesService:
             )
             logger.info("Built article", extra={"title": article.title})
         self._track_browsing(article, navlog)
+        self._process_article_graph(article)
 
     def _add_llm_summarisation(
         self, current_article, article_summary, embedding, token_count

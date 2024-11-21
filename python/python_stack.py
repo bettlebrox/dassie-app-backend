@@ -164,7 +164,7 @@ class PythonStack(Stack):
         return {
             "build_articles": self.create_lambda_function(
                 "build_articles",
-                {**lambda_function_props, "timeout": Duration.seconds(240)},
+                {**lambda_function_props, "timeout": Duration.minutes(5)},
             ),
             "build_themes": self.create_lambda_function(
                 "build_themes",
