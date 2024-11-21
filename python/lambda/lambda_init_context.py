@@ -107,7 +107,7 @@ class LambdaInitContext:
         return self._browse_repo
 
     @property
-    def article_service(self) -> ArticlesService:
+    def articles_service(self) -> ArticlesService:
         if self._article_service is None:
             logger.info("init article service")
             self._article_service = ArticlesService(

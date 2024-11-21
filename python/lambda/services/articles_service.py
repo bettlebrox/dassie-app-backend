@@ -89,7 +89,11 @@ class ArticlesService:
         ):
             themes = list(set(article_summary["themes"]).union(set(themes)))
         if sorted(themes) != sorted(
-            [theme for theme in current_article.themes if theme is not None]
+            [
+                theme.original_title
+                for theme in current_article.themes
+                if theme is not None
+            ]
         ):
             self._theme_repo.add_related(current_article, themes)
 

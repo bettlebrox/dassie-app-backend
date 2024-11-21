@@ -42,7 +42,7 @@ def lambda_handler(
                     continue
                 logger.debug("processing navlog", extra={"navlog": navlog})
                 count += 1
-                init_context.article_service.process_navlog(navlog)
+                init_context.articles_service.process_navlog(navlog)
                 init_context.navlog_service.delete_navlog(navlog["id"])
             except Exception as error:
                 logger.exception("Error processing navlog", extra={"error": str(error)})
