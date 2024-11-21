@@ -11,6 +11,7 @@ import os
 from theme_repo import ThemeRepository
 from dassie_logger import logger
 from services.neptune_client import NeptuneClient
+from langfuse.decorators import langfuse_context
 
 
 class LambdaInitContext:
@@ -33,6 +34,8 @@ class LambdaInitContext:
         neptune_client=None,
         openai_secret=None,
         lang_fuse_secret=None,
+        langfuse_enabled=True,
+        release="dev",
     ):
         logger.info("init lambda context")
         self._secrets_manager = secrets_manager
@@ -49,6 +52,19 @@ class LambdaInitContext:
         self._neptune_client = neptune_client
         self._openai_secret = openai_secret
         self._lang_fuse_secret = lang_fuse_secret
+        self.langfuse_enabled = langfuse_enabled
+        if langfuse_enabled:
+            try:
+                release = os.environ["DD_VERSION"]
+            except KeyError:
+                pass
+            langfuse_context.configure(
+                secret_key=self.lang_fuse_secret,
+                public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
+                host="https://cloud.langfuse.com",
+                release=release,
+                enabled=langfuse_enabled,
+            )
 
     @property
     def neptune_client(self) -> NeptuneClient:
@@ -158,9 +174,14 @@ class LambdaInitContext:
     @property
     def lang_fuse_secret(self) -> str:
         if self._lang_fuse_secret is None:
-            self._lang_fuse_secret = self._get_secret_string_from_arn(
-                os.environ["LANGFUSE_SECRET_ARN"], self.LANGFUSE_SECRET_KEY
-            )
+            if "LANGFUSE_SECRET_ARN" in os.environ:
+                self._lang_fuse_secret = self._get_secret_string_from_arn(
+                    os.environ["LANGFUSE_SECRET_ARN"], self.LANGFUSE_SECRET_KEY
+                )
+            else:
+                self.langfuse_enabled = False
+                self._lang_fuse_secret = "test_secret_key"
+                logger.info("langfuse is not enabled")
         return self._lang_fuse_secret
 
     @property
@@ -173,10 +194,7 @@ class LambdaInitContext:
                     "langfuse_secret_arn": os.environ["LANGFUSE_SECRET_ARN"],
                 },
             )
-            self._openai_client = OpenAIClient(
-                self.openai_secret,
-                self.lang_fuse_secret,
-            )
+            self._openai_client = OpenAIClient(self.openai_secret)
         logger.debug("retrieved openai client")
         return self._openai_client
 

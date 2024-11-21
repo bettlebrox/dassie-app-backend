@@ -1,4 +1,3 @@
-import os
 import json
 from typing import Literal
 from openai import NOT_GIVEN
@@ -49,20 +48,8 @@ class OpenAIClient:
     Output opencypher (Neptune-9.0.20190305-1.0) query to create only the grounded entities and relations, assume the entities and relations may already exist.Finally add SOURCE_OF relations from (a:Article {{id: \"{article_id}\"}}) to all of the entities"""
     TEMPERATURE = 0
 
-    def __init__(self, api_key, langfuse_key, langfuse_enabled=True):
+    def __init__(self, api_key):
         self.openai_client = OpenAI(api_key=api_key)
-        release = "dev"
-        try:
-            release = os.environ["DD_VERSION"]
-        except KeyError:
-            pass
-        langfuse_context.configure(
-            secret_key=langfuse_key,
-            public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
-            host="https://cloud.langfuse.com",
-            release=release,
-            enabled=langfuse_enabled,
-        )
 
     @observe()
     def get_embedding(self, article, model="text-embedding-ada-002"):

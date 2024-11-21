@@ -1,33 +1,19 @@
-import os
 import boto3
 import re
 from dassie_logger import logger
 from models.article import Article
 from models.theme import Theme
-from langfuse.decorators import langfuse_context
 from langfuse.decorators import observe
 
 
 class NeptuneClient:
     _endpoint = "https://127.0.0.1:8182"
 
-    def __init__(self, endpoint, langfuse_key, langfuse_enabled=True, session=None):
+    def __init__(self, endpoint, session=None):
         self._endpoint = endpoint
         if session is None:
             session = boto3.Session()
         self.client = session.client("neptunedata", endpoint_url=endpoint)
-        release = "dev"
-        try:
-            release = os.environ["DD_VERSION"]
-        except KeyError:
-            pass
-        langfuse_context.configure(
-            secret_key=langfuse_key,
-            public_key="pk-lf-b2888d04-2d31-4b07-8f53-d40d311d4d13",
-            host="https://cloud.langfuse.com",
-            release=release,
-            enabled=langfuse_enabled,
-        )
 
     @observe()
     def execute(self, query: str, rewrite_query: bool = True):

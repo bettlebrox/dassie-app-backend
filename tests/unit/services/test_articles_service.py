@@ -176,7 +176,9 @@ def test_process_article_graph(articles_service, neptune_client, llm_client):
     assert graph != []
 
 
-def test_process_article_graph_with_existing_graph(articles_service, neptune_client):
+def test_process_article_graph_with_existing_graph(
+    articles_service, neptune_client, llm_client
+):
     article = Article(
         original_title="Test Article",
         url="https://example.com",
@@ -198,7 +200,9 @@ def test_process_article_graph_with_existing_graph(articles_service, neptune_cli
     assert graph == existing_graph
 
 
-def test_process_article_graph_with_stale_graph(articles_service, neptune_client):
+def test_process_article_graph_with_stale_graph(
+    articles_service, neptune_client, llm_client
+):
     article = Article(
         original_title="Test Article",
         url="https://example.com",
@@ -226,7 +230,9 @@ def test_process_article_graph_with_stale_graph(articles_service, neptune_client
     assert graph == new_graph
 
 
-def test_process_article_graph_with_empty_graph(articles_service, neptune_client):
+def test_process_article_graph_with_empty_graph(
+    articles_service, neptune_client, llm_client
+):
     article = Article(
         original_title="Test Article",
         url="https://example.com",

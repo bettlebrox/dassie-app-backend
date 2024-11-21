@@ -51,8 +51,8 @@ class TestLambdaInitContext(unittest.TestCase):
     def test_openai_client_property(self):
         mock_secrets_manager = MagicMock()
         mock_secrets_manager.get_secret_value.side_effect = [
-            {"SecretString": '{"OPENAI_API_KEY": "test_openai_key"}'},
             {"SecretString": '{"langfuse_secret_key": "test_langfuse_key"}'},
+            {"SecretString": '{"OPENAI_API_KEY": "test_openai_key"}'},
         ]
         context = LambdaInitContext(secrets_manager=mock_secrets_manager)
         self.assertIsNotNone(context.openai_client)

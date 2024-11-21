@@ -87,7 +87,9 @@ class ArticlesService:
             and len(themes) < 3
         ):
             themes = list(set(article_summary["themes"]).union(set(themes)))
-        if sorted(themes) != sorted(current_article.themes):
+        if sorted(themes) != sorted(
+            [theme for theme in current_article.themes if theme is not None]
+        ):
             self._theme_repo.add_related(current_article, themes)
 
     def get_search_terms_from_article(self, article):

@@ -1,14 +1,9 @@
 import json
 import os
 import pytest
-from moto import mock_aws
-import boto3
 from unittest.mock import MagicMock
 from add_theme import lambda_handler
-from models.article import Article
 from models.theme import Theme, ThemeType
-from services.openai_client import LLMResponseException
-from services.themes_service import ThemesService
 
 
 @pytest.fixture(scope="function")
@@ -29,24 +24,7 @@ def mock_context():
     return MagicMock()
 
 
-@pytest.fixture
-def create_secret():
-    with mock_aws():
-        secretsmanager = boto3.client("secretsmanager")
-        response = secretsmanager.create_secret(
-            SecretString='{"username": "username", "password": "password", "dbname": "dbname"}',
-            Name=os.environ["DB_SECRET_ARN"],
-        )
-        response = secretsmanager.create_secret(
-            SecretString='{"OPENAI_API_KEY": "openai_api_key"}',
-            Name="OPENAIKEY_SECRET_ARN",
-        )
-        os.environ["OPENAIKEY_SECRET_ARN"] = response["ARN"]
-        yield secretsmanager
-
-
-@mock_aws
-def test_add_theme(aws_credentials, create_secret, mock_context):
+def test_add_theme(mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
     theme_service = MagicMock()
     boto_event_client = MagicMock()
@@ -69,8 +47,7 @@ def test_add_theme(aws_credentials, create_secret, mock_context):
     assert boto_event_client.put_events.call_count == 1
 
 
-@mock_aws
-def test_add_theme_error(aws_credentials, create_secret, mock_context):
+def test_add_theme_error(mock_context):
     event = {"body": json.dumps({"title": "new theme"})}
     theme_service = MagicMock()
     theme_service.get_theme_by_original_title.side_effect = Exception("error")

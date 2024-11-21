@@ -6,9 +6,12 @@ from models.theme import Theme, ThemeType
 from models.article import Article
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_context():
-    return MagicMock()
+    mock_context = MagicMock()
+    mock_context.function_name = "process_theme"
+    mock_context.function_version = "1"
+    return mock_context
 
 
 @pytest.fixture
@@ -26,8 +29,17 @@ def mock_theme_service():
     return MagicMock()
 
 
+@pytest.fixture
+def mock_boto_event_client():
+    return MagicMock()
+
+
 def test_process_theme_success(
-    mock_context, mock_article_repo, mock_openai_client, mock_theme_service
+    mock_context,
+    mock_article_repo,
+    mock_openai_client,
+    mock_theme_service,
+    mock_boto_event_client,
 ):
     event = {"body": json.dumps({"title": "Test Theme"})}
 
@@ -54,6 +66,7 @@ def test_process_theme_success(
         openai_client=mock_openai_client,
         theme_service=mock_theme_service,
         useGlobal=False,
+        boto_event_client=mock_boto_event_client,
     )
 
     assert response["statusCode"] == 200
