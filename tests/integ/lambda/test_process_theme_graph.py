@@ -4,7 +4,9 @@ import pytest
 from lambda_init_context import LambdaInitContext
 from process_theme_graph import lambda_handler
 from dotenv import load_dotenv
-from tests.integ.test_integration import GITHUB_ACTIONS
+import os
+
+GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")

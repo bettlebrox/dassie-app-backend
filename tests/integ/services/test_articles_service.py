@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 from langfuse.decorators import observe
 from langfuse.decorators import langfuse_context
 from models.theme import Theme
-from tests.integ.test_integration import GITHUB_ACTIONS
+import os
+
+GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
@@ -75,6 +77,8 @@ def test_add_llm_summarisation_success(init_context: LambdaInitContext):
     theme_repo.get.return_value = [
         (Theme(original_title="test"), 0.5),
         (Theme(original_title="test2"), 0.5),
+        (Theme(original_title="test3"), 0.5),
+        (Theme(original_title="test4"), 0.5),
     ]
     try:
         articles_service._add_llm_summarisation(article, summary, [0] * 1536, 1)

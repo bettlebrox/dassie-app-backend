@@ -87,15 +87,13 @@ class ArticlesService:
             and article_summary["themes"] is not None
             and len(themes) < 3
         ):
-            themes = list(set(article_summary["themes"]).union(set(themes)))
-        if sorted(themes) != sorted(
-            [
-                theme.original_title
-                for theme in current_article.themes
-                if theme is not None
-            ]
-        ):
-            self._theme_repo.add_related(current_article, themes)
+            new_themes = list(set(article_summary["themes"]).union(set(themes)))
+            logger.info(
+                "Adding new themes",
+                extra={"themes": new_themes, "current_themes": themes},
+            )
+            if sorted(new_themes) != sorted(themes):
+                self._theme_repo.add_related(current_article, new_themes)
 
     def get_search_terms_from_article(self, article):
         if article.original_title.endswith("- Google Search"):
