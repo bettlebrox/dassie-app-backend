@@ -15,7 +15,6 @@ import os
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
-@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 @pytest.fixture
 def init_context() -> LambdaInitContext:
     assert load_dotenv("tests/integ/lambda/local.env")
@@ -31,6 +30,7 @@ def init_context() -> LambdaInitContext:
 
 
 @observe(name="test_process_theme_graph_success")
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_process_theme_graph_success(init_context: LambdaInitContext):
     articles_service = init_context.articles_service
     test_article = Article(original_title="test", url="test")
@@ -48,6 +48,7 @@ def test_process_theme_graph_success(init_context: LambdaInitContext):
         assert False, f"Error during cleanup: {e}"
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_process_navlog_success(init_context: LambdaInitContext):
     articles_service = init_context.articles_service
     navlog = {
@@ -63,6 +64,7 @@ def test_process_navlog_success(init_context: LambdaInitContext):
         assert False, f"Error during process_navlog: {e}"
 
 
+@pytest.mark.skipif(GITHUB_ACTIONS, reason="no environment yet")
 def test_add_llm_summarisation_success(init_context: LambdaInitContext):
     article_repo = MagicMock()
     theme_repo = MagicMock()
