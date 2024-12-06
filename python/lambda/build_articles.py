@@ -4,8 +4,10 @@ from lambda_init_context import LambdaInitContext
 from aws_lambda_powertools.logging import correlation_paths
 from dassie_logger import logger
 from services.articles_service import ArticlesService
+from services.opencypher_translator import OpenCypherTranslatorClient
 
 init_context = None
+articles_service = None
 
 
 @logger.inject_lambda_context(
@@ -14,23 +16,38 @@ init_context = None
 def lambda_handler(
     event,
     context,
-    articles_service=None,
     navlog_service=None,
+    article_repo=None,
+    theme_repo=None,
+    browse_repo=None,
+    browsed_repo=None,
+    openai_client=None,
+    neptune_client=None,
+    opencypher_translator_client=OpenCypherTranslatorClient(),
     useGlobal=True,
 ):
     logger.debug("build_articles")
     global init_context
+    global articles_service
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(
             navlog_service=navlog_service,
+            article_repo=article_repo,
+            theme_repo=theme_repo,
+            browse_repo=browse_repo,
+            browsed_repo=browsed_repo,
+            openai_client=openai_client,
+            neptune_client=neptune_client,
         )
+    if articles_service is None or not useGlobal:
         articles_service = ArticlesService(
-            init_context.article_repo,
-            init_context.theme_repo,
-            init_context.browse_repo,
-            init_context.browsed_repo,
-            init_context.openai_client,
-            init_context.neptune_client,
+            article_repo,
+            theme_repo,
+            browse_repo,
+            browsed_repo,
+            openai_client,
+            neptune_client,
+            opencypher_translator_client,
         )
 
     try:

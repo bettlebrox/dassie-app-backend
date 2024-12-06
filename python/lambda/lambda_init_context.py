@@ -33,6 +33,7 @@ class LambdaInitContext:
         openai_secret=None,
         lang_fuse_secret=None,
         langfuse_enabled=True,
+        browsed_repo=None,
         release="dev",
     ):
         logger.info("init lambda context")
@@ -43,7 +44,7 @@ class LambdaInitContext:
         self._theme_repo = theme_repo
         self._theme_service = theme_service
         self._browse_repo = browse_repo
-        self._browsed_repo = None
+        self._browsed_repo = browsed_repo
         self._navlog_service = navlog_service
         self._boto_event_client = boto_event_client
         self._neptune_client = neptune_client

@@ -8,7 +8,7 @@ from models.article import Article
 from models.theme import Theme
 from services.neptune_client import NeptuneClient
 from services.openai_client import OpenAIClient
-from services.opencypher_translator import OpenCypherTranslator
+from services.opencypher_translator import OpenCypherTranslatorClient
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def neptune_client():
 
 
 @pytest.fixture
-def opencypher_translator():
+def opencypher_translator_client():
     return MagicMock()
 
 
@@ -54,7 +54,7 @@ def articles_service(
     browsed_repo,
     llm_client,
     neptune_client,
-    opencypher_translator,
+    opencypher_translator_client,
 ):
     return ArticlesService(
         articles_repo,
@@ -63,7 +63,7 @@ def articles_service(
         browsed_repo,
         llm_client,
         neptune_client,
-        opencypher_translator,
+        opencypher_translator_client,
     )
 
 
@@ -175,11 +175,12 @@ def test_process_article_graph(
     articles_service: ArticlesService,
     neptune_client: NeptuneClient,
     llm_client: OpenAIClient,
-    opencypher_translator: OpenCypherTranslator,
+    opencypher_translator_client: OpenCypherTranslatorClient,
 ):
     article = Article(
         original_title="Test Article",
         url="https://example.com",
+        text="This is a test article",
     )
     article._updated_at = datetime.now() - timedelta(days=2)
     article._id = 1
@@ -188,8 +189,8 @@ def test_process_article_graph(
     merge (e:Entity {name: "entity1"})
     merge (a:Article {id: 1})-[:SOURCE_OF]->(e)
     """
-    llm_client.get_article_entities.return_value = "entity1"
-    opencypher_translator.generate_article_graph.return_value = graph_opencypher
+    llm_client.get_article_entities.return_value = "merge (e:Entity {name: 'entity1'})"
+    opencypher_translator_client.generate_article_graph.return_value = graph_opencypher
     graph = articles_service._process_article_graph(article)
     neptune_client.upsert_article_graph.assert_called_once_with(
         article, graph_opencypher, ANY
@@ -222,7 +223,7 @@ def test_process_article_graph_with_existing_graph(
 
 
 def test_process_article_graph_with_stale_graph(
-    articles_service, neptune_client, llm_client, opencypher_translator
+    articles_service, neptune_client, llm_client, opencypher_translator_client
 ):
     article = Article(
         original_title="Test Article",
@@ -242,17 +243,17 @@ def test_process_article_graph_with_stale_graph(
     """
     neptune_client.get_article_graph.return_value = existing_graph
     llm_client.get_article_entities.return_value = "entity1"
-    opencypher_translator.generate_article_graph.return_value = new_graph
+    opencypher_translator_client.generate_article_graph.return_value = new_graph
     graph = articles_service._process_article_graph(article)
 
     # Should regenerate graph since existing one is stale
-    opencypher_translator.generate_article_graph.assert_called_once()
+    opencypher_translator_client.generate_article_graph.assert_called_once()
     neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
     assert graph == new_graph
 
 
 def test_process_article_graph_with_empty_graph(
-    articles_service, neptune_client, llm_client, opencypher_translator
+    articles_service, neptune_client, llm_client, opencypher_translator_client
 ):
     article = Article(
         original_title="Test Article",
@@ -267,12 +268,12 @@ def test_process_article_graph_with_empty_graph(
     MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
     """
     llm_client.get_article_entities.return_value = "entity1"
-    opencypher_translator.generate_article_graph.return_value = new_graph
+    opencypher_translator_client.generate_article_graph.return_value = new_graph
 
     graph = articles_service._process_article_graph(article)
 
     # Should generate new graph since none exists
-    opencypher_translator.generate_article_graph.assert_called_once()
+    opencypher_translator_client.generate_article_graph.assert_called_once()
     neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
     assert graph == new_graph
 

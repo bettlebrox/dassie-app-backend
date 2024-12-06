@@ -26,6 +26,7 @@ class ArticlesService:
         browsed_repo: BrowsedRepository,
         openai_client: OpenAIClient,
         neptune_client: NeptuneClient,
+        opencypher_translator_client: OpenCypherTranslatorClient = OpenCypherTranslatorClient(),
     ):
         self._article_repo = article_repo
         self._theme_repo = theme_repo
@@ -33,7 +34,7 @@ class ArticlesService:
         self._browsed_repo = browsed_repo
         self._llm_client = openai_client
         self._neptune_client = neptune_client
-        self._opencypher_translator = OpenCypherTranslatorClient()
+        self._opencypher_translator_client = opencypher_translator_client
 
     def process_navlog(self, navlog):
         article = self._article_repo.get_or_insert(
@@ -114,7 +115,7 @@ class ArticlesService:
         entities = self._llm_client.get_article_entities(article.text, article.id)
         if entities is None:
             return None
-        graph_opencypher = self._opencypher_translator.generate_article_graph(
+        graph_opencypher = self._opencypher_translator_client.generate_article_graph(
             article.text, article.id, entities
         )
         if graph_opencypher is None:

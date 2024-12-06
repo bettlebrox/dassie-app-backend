@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import Mock, patch
 from services.openai_client import OpenAIClient, LLMResponseException
-import json
 
 
 @pytest.fixture
@@ -62,52 +61,6 @@ def test_get_completion_json_decode_error(openai_client):
             openai_client.get_completion(
                 "Test prompt", "Test query" * 100, json_response=True
             )
-
-
-def test_get_article_graph(openai_client):
-    assert (
-        openai_client._get_opencypher_code_block(
-            "```opencypher\nCREATE (a:Article {id: 'test_id'})\n```"
-        )
-        == "CREATE (a:Article {id: 'test_id'})"
-    )
-    assert (
-        openai_client._get_opencypher_code_block(
-            "some preamble text that I don't really care about ```cypher\nCREATE (a:Article {id: 'test_id'})\n```"
-        )
-        == "CREATE (a:Article {id: 'test_id'})"
-    )
-
-
-def test_get_cypher_code_block_unterminated_block(openai_client):
-    example_text = """ provided text, the following entities and relations are grounded:
-
-1. **Entity: RDFLib**
-   - Title: "RDFLib"
-   - Description: "RDFLib is a pure Python package for working with RDF."
-   - Release Date: "2023"
-   - Version: "7.0.0"
-   - Homepage: "https://github.com/RDFLib/rdflib"
-   - Programming Language: Python
-   - License: MIT License
-   - Developer: RDFLib Team
-
-2. **Entity: RDFLib Team**
-   - Name: "RDFLib Team"
-   - Homepage: "https://github.com/RDFLib"
-
-
-Here is the corresponding Cypher query:
-
-```cypher
-MERGE (a:Article {id: '6417f3da-51be-4328-99a5-66df16901ebd'})
-MERGE (a)-[:SOURCE_OF]->(d)"""
-    result = openai_client._get_opencypher_code_block(example_text)
-    assert (
-        result
-        == """MERGE (a:Article {id: '6417f3da-51be-4328-99a5-66df16901ebd'})
-MERGE (a)-[:SOURCE_OF]->(d)"""
-    )
 
 
 def test_get_article_summarization(openai_client):
