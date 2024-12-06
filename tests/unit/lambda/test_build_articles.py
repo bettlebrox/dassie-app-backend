@@ -35,7 +35,7 @@ def test_build_articles_success(article_service, navlog_service, mock_context):
     response = lambda_handler(
         event,
         mock_context,
-        article_service=article_service,
+        articles_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
     )
@@ -59,7 +59,7 @@ def test_build_articles_skip_short_text(article_service, navlog_service, mock_co
     response = lambda_handler(
         event,
         mock_context,
-        article_service=article_service,
+        articles_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
     )
@@ -82,7 +82,7 @@ def test_build_articles_skip_old_navlog(article_service, navlog_service, mock_co
     response = lambda_handler(
         event,
         mock_context,
-        article_service=article_service,
+        articles_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
     )
@@ -105,7 +105,7 @@ def test_build_articles_error_handling(article_service, navlog_service, mock_con
     response = lambda_handler(
         event,
         mock_context,
-        article_service=article_service,
+        articles_service=article_service,
         navlog_service=navlog_service,
         useGlobal=False,
     )

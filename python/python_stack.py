@@ -32,10 +32,11 @@ class PythonStack(Stack):
         construct_id: str,
         dependencies_stack: PythonDependenciesStack,
         infra_stack: InfraStack,
+        runtime: lambda_.Runtime,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
+        self.runtime = runtime
         (
             self.bucket,
             self.lambdas_env,
@@ -47,6 +48,8 @@ class PythonStack(Stack):
             dependencies_stack.datadog_secret,
             infra_stack.ddb,
         )
+        self.layers = [dependencies_stack.reqs_layer, dependencies_stack.ai_layer]
+
         lambda_function_props = self._get_default_lambda_props(
             infra_stack.lambda_db_access_sg,
             infra_stack.lambda_neptune_access_sg,
@@ -73,9 +76,9 @@ class PythonStack(Stack):
 
         # Hack to deal with lack of support for aliases on sam local start-api
         if construct_id != "LocalStack":
-            self._create_auto_scaling_for_lambda(
-                "get_themes", self.aliases, self.functions
-            )
+            # self._create_auto_scaling_for_lambda(
+            #     "get_themes", self.aliases, self.functions
+            # )
             self._create_auto_scaling_for_lambda("search", self.aliases, self.functions)
             self._create_auto_scaling_for_lambda(
                 "add_theme", self.aliases, self.functions
@@ -162,7 +165,7 @@ class PythonStack(Stack):
         lambdas_env,
     ):
         return {
-            "build_articles": self.create_lambda_function(
+            "build_articles": self.create_lambda_docker_function(
                 "build_articles",
                 {**lambda_function_props, "timeout": Duration.minutes(5)},
             ),
@@ -219,6 +222,24 @@ class PythonStack(Stack):
         function_name,
         lambda_function_props,
     ):
+        lambda_function_props["layers"] = self.layers
+        lambda_function = lambda_.Function(
+            self,
+            function_name,
+            runtime=self.runtime,
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            handler=f"{function_name.lower()}.lambda_handler",
+            snap_start=lambda_.SnapStartConf.ON_PUBLISHED_VERSIONS,
+            **lambda_function_props,
+        )
+        del lambda_function_props["layers"]
+        return lambda_function
+
+    def create_lambda_docker_function(
+        self,
+        function_name,
+        lambda_function_props,
+    ):
         lambda_function_props["environment"][
             "DD_LAMBDA_HANDLER"
         ] = f"{function_name.lower()}.lambda_handler"
@@ -228,6 +249,7 @@ class PythonStack(Stack):
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
                 cmd=["datadog_lambda.handler.handler"],
+                build_args={"RUNTIME": self.runtime.name[6:]},
             ),
             **lambda_function_props,
         )
@@ -372,6 +394,7 @@ class PythonStack(Stack):
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
                 cmd=["datadog_lambda.handler.handler"],
+                build_args={"RUNTIME": self.runtime.name[6:]},
             ),
             environment=lambdas_env,
             timeout=Duration.minutes(1),
@@ -412,6 +435,7 @@ class PythonStack(Stack):
             code=lambda_.DockerImageCode.from_image_asset(
                 path.join(os.getcwd(), "python"),
                 cmd=["datadog_lambda.handler.handler"],
+                build_args={"RUNTIME": self.runtime.name[6:]},
             ),
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),

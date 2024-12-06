@@ -3,6 +3,7 @@ import json
 from lambda_init_context import LambdaInitContext
 from aws_lambda_powertools.logging import correlation_paths
 from dassie_logger import logger
+from services.articles_service import ArticlesService
 
 init_context = None
 
@@ -13,7 +14,7 @@ init_context = None
 def lambda_handler(
     event,
     context,
-    article_service=None,
+    articles_service=None,
     navlog_service=None,
     useGlobal=True,
 ):
@@ -21,8 +22,15 @@ def lambda_handler(
     global init_context
     if init_context is None or not useGlobal:
         init_context = LambdaInitContext(
-            article_service=article_service,
             navlog_service=navlog_service,
+        )
+        articles_service = ArticlesService(
+            init_context.article_repo,
+            init_context.theme_repo,
+            init_context.browse_repo,
+            init_context.browsed_repo,
+            init_context.openai_client,
+            init_context.neptune_client,
         )
 
     try:
@@ -42,7 +50,7 @@ def lambda_handler(
                     continue
                 logger.debug("processing navlog", extra={"navlog": navlog})
                 count += 1
-                init_context.articles_service.process_navlog(navlog)
+                articles_service.process_navlog(navlog)
                 init_context.navlog_service.delete_navlog(navlog["id"])
             except Exception as error:
                 logger.exception("Error processing navlog", extra={"error": str(error)})

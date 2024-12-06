@@ -1,7 +1,6 @@
 from repos import BrowsedRepository
 from browse_repo import BrowseRepository
 from article_repo import ArticleRepository
-from services.articles_service import ArticlesService
 from services.navlogs_service import NavlogService
 from services.openai_client import OpenAIClient
 from services.themes_service import ThemesService
@@ -27,7 +26,6 @@ class LambdaInitContext:
         openai_client=None,
         theme_repo=None,
         theme_service=None,
-        article_service=None,
         navlog_service=None,
         browse_repo=None,
         boto_event_client=None,
@@ -44,7 +42,6 @@ class LambdaInitContext:
         self._openai_client = openai_client
         self._theme_repo = theme_repo
         self._theme_service = theme_service
-        self._article_service = article_service
         self._browse_repo = browse_repo
         self._browsed_repo = None
         self._navlog_service = navlog_service
@@ -105,21 +102,6 @@ class LambdaInitContext:
             )
         logger.debug("retrieved browse repo")
         return self._browse_repo
-
-    @property
-    def articles_service(self) -> ArticlesService:
-        if self._article_service is None:
-            logger.info("init article service")
-            self._article_service = ArticlesService(
-                self.article_repo,
-                self.theme_repo,
-                self.browse_repo,
-                self.browsed_repo,
-                self.openai_client,
-                self.neptune_client,
-            )
-        logger.debug("retrieved article service")
-        return self._article_service
 
     @property
     def secrets_manager(self) -> boto3.client:

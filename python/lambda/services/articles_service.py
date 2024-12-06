@@ -10,6 +10,7 @@ from models.article import Article
 from repos import BrowsedRepository
 from services.neptune_client import NeptuneClient
 from services.openai_client import OpenAIClient
+from services.opencypher_translator import OpenCypherTranslatorClient
 from theme_repo import ThemeRepository
 
 
@@ -32,6 +33,7 @@ class ArticlesService:
         self._browsed_repo = browsed_repo
         self._llm_client = openai_client
         self._neptune_client = neptune_client
+        self._opencypher_translator = OpenCypherTranslatorClient()
 
     def process_navlog(self, navlog):
         article = self._article_repo.get_or_insert(
@@ -109,8 +111,11 @@ class ArticlesService:
         ):
             logger.info("Article graph already exists", extra={"article": article.id})
             return current_graph
-        graph_opencypher = self._llm_client.generate_article_graph(
-            article.text, article.id
+        entities = self._llm_client.get_article_entities(article.text, article.id)
+        if entities is None:
+            return None
+        graph_opencypher = self._opencypher_translator.generate_article_graph(
+            article.text, article.id, entities
         )
         if graph_opencypher is None:
             return None

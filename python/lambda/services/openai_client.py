@@ -1,5 +1,4 @@
 import json
-from typing import Literal
 from openai import NOT_GIVEN
 import tiktoken
 from langfuse.decorators import langfuse_context
@@ -7,8 +6,6 @@ from langfuse.decorators import observe
 from langfuse.openai import OpenAI
 
 from dassie_logger import logger
-
-from services.opencypher_translator import translator
 
 
 class LLMResponseException(Exception):
@@ -109,7 +106,7 @@ class OpenAIClient:
         return None
 
     @observe()
-    def generate_article_graph(self, article, article_id, model="gpt-4o-mini"):
+    def get_article_entities(self, article, article_id, model="gpt-4o-mini"):
         langfuse_context.update_current_trace(
             input={"article_id": article_id},
         )
@@ -119,26 +116,7 @@ class OpenAIClient:
         entities = self.get_completion(
             self.ARTICLE_ENTITIES_PROMPT, article, model=model, json_response=False
         )
-        response = self.translate_to_opencypher(entities, article, article_id)
-        return self._get_opencypher_code_block(response)
-
-    @observe(as_type=Literal["generation"])
-    def translate_to_opencypher(self, entities, article, article_id):
-        return translator(
-            question=entities + "\n---\n" + article, article_id=article_id
-        ).response
-
-    def _get_opencypher_code_block(self, open_cypher):
-        code_block = open_cypher.strip()
-        for delimiter in [
-            "```opencypher",
-            "```cypher",
-            "```",
-        ]:
-            if delimiter in code_block:
-                code_block = code_block.split(delimiter, 1)[-1]
-                break
-        return code_block.strip("`").strip()
+        return entities
 
     @observe()
     def get_article_summarization(self, article, model=MODEL):

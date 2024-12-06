@@ -12,6 +12,8 @@ from langfuse.decorators import langfuse_context
 from models.theme import Theme
 import os
 
+from services.opencypher_translator import OpenCypherTranslator
+
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
@@ -54,7 +56,8 @@ def test_process_navlog_success(init_context: LambdaInitContext):
     navlog = {
         "title": "test",
         "url": "test",
-        "body_text": "test",
+        "tabId": "test",
+        "body_text": "text of the body of the page",
         "created_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f"),
         "id": "test",
     }

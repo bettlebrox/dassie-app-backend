@@ -6,6 +6,9 @@ from models.browse import Browse
 from services.articles_service import ArticlesService
 from models.article import Article
 from models.theme import Theme
+from services.neptune_client import NeptuneClient
+from services.openai_client import OpenAIClient
+from services.opencypher_translator import OpenCypherTranslator
 
 
 @pytest.fixture
@@ -39,8 +42,19 @@ def neptune_client():
 
 
 @pytest.fixture
+def opencypher_translator():
+    return MagicMock()
+
+
+@pytest.fixture
 def articles_service(
-    articles_repo, themes_repo, browse_repo, browsed_repo, llm_client, neptune_client
+    articles_repo,
+    themes_repo,
+    browse_repo,
+    browsed_repo,
+    llm_client,
+    neptune_client,
+    opencypher_translator,
 ):
     return ArticlesService(
         articles_repo,
@@ -49,6 +63,7 @@ def articles_service(
         browsed_repo,
         llm_client,
         neptune_client,
+        opencypher_translator,
     )
 
 
@@ -156,7 +171,12 @@ def test_add_llm_summarisation(articles_service, articles_repo, themes_repo):
     assert set(call_args[1]) == {"theme1", "theme2"}
 
 
-def test_process_article_graph(articles_service, neptune_client, llm_client):
+def test_process_article_graph(
+    articles_service: ArticlesService,
+    neptune_client: NeptuneClient,
+    llm_client: OpenAIClient,
+    opencypher_translator: OpenCypherTranslator,
+):
     article = Article(
         original_title="Test Article",
         url="https://example.com",
@@ -168,7 +188,8 @@ def test_process_article_graph(articles_service, neptune_client, llm_client):
     merge (e:Entity {name: "entity1"})
     merge (a:Article {id: 1})-[:SOURCE_OF]->(e)
     """
-    llm_client.generate_article_graph.return_value = graph_opencypher
+    llm_client.get_article_entities.return_value = "entity1"
+    opencypher_translator.generate_article_graph.return_value = graph_opencypher
     graph = articles_service._process_article_graph(article)
     neptune_client.upsert_article_graph.assert_called_once_with(
         article, graph_opencypher, ANY
@@ -201,7 +222,7 @@ def test_process_article_graph_with_existing_graph(
 
 
 def test_process_article_graph_with_stale_graph(
-    articles_service, neptune_client, llm_client
+    articles_service, neptune_client, llm_client, opencypher_translator
 ):
     article = Article(
         original_title="Test Article",
@@ -220,18 +241,18 @@ def test_process_article_graph_with_stale_graph(
     MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
     """
     neptune_client.get_article_graph.return_value = existing_graph
-    llm_client.generate_article_graph.return_value = new_graph
-
+    llm_client.get_article_entities.return_value = "entity1"
+    opencypher_translator.generate_article_graph.return_value = new_graph
     graph = articles_service._process_article_graph(article)
 
     # Should regenerate graph since existing one is stale
-    llm_client.generate_article_graph.assert_called_once()
+    opencypher_translator.generate_article_graph.assert_called_once()
     neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
     assert graph == new_graph
 
 
 def test_process_article_graph_with_empty_graph(
-    articles_service, neptune_client, llm_client
+    articles_service, neptune_client, llm_client, opencypher_translator
 ):
     article = Article(
         original_title="Test Article",
@@ -245,12 +266,13 @@ def test_process_article_graph_with_empty_graph(
     MERGE (e:Entity {name: "new"})
     MERGE (a:Article {id: 1})-[:SOURCE_OF]->(e)
     """
-    llm_client.generate_article_graph.return_value = new_graph
+    llm_client.get_article_entities.return_value = "entity1"
+    opencypher_translator.generate_article_graph.return_value = new_graph
 
     graph = articles_service._process_article_graph(article)
 
     # Should generate new graph since none exists
-    llm_client.generate_article_graph.assert_called_once()
+    opencypher_translator.generate_article_graph.assert_called_once()
     neptune_client.upsert_article_graph.assert_called_once_with(article, new_graph, ANY)
     assert graph == new_graph
 

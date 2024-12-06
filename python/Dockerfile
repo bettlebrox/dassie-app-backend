@@ -1,5 +1,5 @@
-# Use the official AWS Lambda Python 3.9 base image
-FROM public.ecr.aws/lambda/python:3.9
+# Use the official AWS Lambda Python 3.12 base image
+FROM public.ecr.aws/lambda/python:3.12
 
 # Set the working directory
 WORKDIR /var/task
