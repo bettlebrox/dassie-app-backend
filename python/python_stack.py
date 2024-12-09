@@ -12,7 +12,8 @@ import aws_cdk.aws_rds as rds
 import aws_cdk.aws_ec2 as ec2
 import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_logs as logs
-
+import aws_cdk.aws_secretsmanager as secretsmanager
+import datadog_cdk_constructs_v2 as datadog
 import aws_cdk.aws_iam as iam
 import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
@@ -66,8 +67,13 @@ class PythonStack(Stack):
         )
 
         self.archive_navlog = self.create_archive_function(
-            infra_stack.ddb, self.lambdas_env
+            infra_stack.ddb, self.lambdas_env, self.layers[0]
         )
+        functions_to_dd_instrument = self.functions.copy()
+        del functions_to_dd_instrument["build_articles"]
+        functions_to_dd_instrument = list(functions_to_dd_instrument.values())
+        functions_to_dd_instrument.append(self.archive_navlog)
+        self.instrument_with_datadog(functions_to_dd_instrument)
 
         self.create_scheduled_event_for_function("build_articles", self.functions, "27")
         self.create_scheduled_event_for_function("build_themes", self.functions, "47")
@@ -214,6 +220,7 @@ class PythonStack(Stack):
                 ddb,
                 bucket,
                 vpc,
+                self.layers[0],
             ),
         }
 
@@ -265,7 +272,7 @@ class PythonStack(Stack):
         return {
             "vpc": vpc,
             "security_groups": [lambda_db_access_sg, lambda_neptune_access_sg],
-            "architecture": lambda_.Architecture.X86_64,
+            "architecture": lambda_.Architecture.ARM_64,
             "memory_size": 1024,
             "environment": lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,
@@ -317,6 +324,25 @@ class PythonStack(Stack):
             lambdas_env,
         )
 
+    def instrument_with_datadog(self, functions):
+        datadog_secret = secretsmanager.Secret.from_secret_complete_arn(
+            self,
+            "datadog_api_key",
+            secret_complete_arn="arn:aws:secretsmanager:eu-west-1:559845934392:secret:prod/dassie/datadog-axXB8t",
+        )
+        datadog_ext = datadog.Datadog(
+            self,
+            "datadog",
+            api_key_secret=datadog_secret,
+            site="datadoghq.eu",
+            python_layer_version=104,
+            extension_layer_version=67,
+            enable_profiling=True,
+        )
+        datadog_ext.add_lambda_functions(functions)
+        for f in functions:
+            datadog_secret.grant_read(f)
+
     def create_postgres_database(self, vpc, bastion, snapshot_id=None):
         common_params = {
             "engine": rds.DatabaseClusterEngine.aurora_postgres(
@@ -366,7 +392,7 @@ class PythonStack(Stack):
         )
         return ddb
 
-    def create_archive_function(self, ddb, lambdas_env):
+    def create_archive_function(self, ddb, lambdas_env, deps_layer):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -388,15 +414,15 @@ class PythonStack(Stack):
         # Create a Lambda function to archive deleted items
         lambdas_env["BUCKET_NAME"] = archive_bucket.bucket_name
         lambdas_env["DD_LAMBDA_HANDLER"] = "archive_navlog.lambda_handler"
-        archive_function = lambda_.DockerImageFunction(
+        archive_function = lambda_.Function(
             self,
-            "ArchiveFunction",
-            code=lambda_.DockerImageCode.from_image_asset(
-                path.join(os.getcwd(), "python"),
-                cmd=["datadog_lambda.handler.handler"],
-                build_args={"RUNTIME": self.runtime.name[6:]},
-            ),
+            "ArchiveFunction1",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="archive_navlog.lambda_handler",
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            architecture=lambda_.Architecture.ARM_64,
             environment=lambdas_env,
+            layers=[deps_layer],
             timeout=Duration.minutes(1),
         )
 
@@ -427,18 +453,16 @@ class PythonStack(Stack):
                     function.connections.security_groups[0], ec2.Port.tcp(5432)
                 )
 
-    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc):
-        lambdas_env["DD_LAMBDA_HANDLER"] = "add_navlog.lambda_handler"
-        addNavlog = lambda_.DockerImageFunction(
+    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc, layer):
+        addNavlog = lambda_.Function(
             self,
-            "add_navlog",
-            code=lambda_.DockerImageCode.from_image_asset(
-                path.join(os.getcwd(), "python"),
-                cmd=["datadog_lambda.handler.handler"],
-                build_args={"RUNTIME": self.runtime.name[6:]},
-            ),
+            "add_navlog1",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
+            handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),
+            layers=[layer],
             vpc=vpc,
             environment=lambdas_env,
         )

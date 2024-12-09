@@ -41,12 +41,12 @@ def lambda_handler(
         )
     if articles_service is None or not useGlobal:
         articles_service = ArticlesService(
-            article_repo,
-            theme_repo,
-            browse_repo,
-            browsed_repo,
-            openai_client,
-            neptune_client,
+            init_context.article_repo,
+            init_context.theme_repo,
+            init_context.browse_repo,
+            init_context.browsed_repo,
+            init_context.openai_client,
+            init_context.neptune_client,
             opencypher_translator_client,
         )
 
