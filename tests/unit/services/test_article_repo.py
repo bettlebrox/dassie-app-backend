@@ -31,7 +31,7 @@ def mock_query(article_repo):
 
 @pytest.fixture
 def mock_simple_order_by(mock_query):
-    return mock_query.order_by
+    return mock_query.where.return_value.order_by
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def test_get_articles_by_theme(article_repo, mock_where):
         )
         for _ in range(10)
     ]
-    mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
+    mock_where.return_value.where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
         articles
     )
     articles = article_repo.get(
@@ -81,7 +81,7 @@ def test_get_articles_by_theme(article_repo, mock_where):
     assert mock_where.call_args[0][0].compare(
         (1 - Article._embedding.cosine_distance(query_embedding)) > 0.8
     )
-    assert mock_where.return_value.order_by.call_args[0][0].compare(
+    assert mock_where.return_value.where.return_value.order_by.call_args[0][0].compare(
         (1 - Article._embedding.cosine_distance(query_embedding)).desc()
     )
 
@@ -348,6 +348,7 @@ def test_get_default_params(article_repo, mock_simple_order_by, mock_simple_limi
     mock_simple_limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
+
     result = article_repo.get()
 
     assert len(result) == 1
@@ -368,7 +369,7 @@ def test_get_with_custom_params(article_repo, mock_simple_order_by, mock_simple_
 
 
 def test_get_with_embedding_filter(article_repo, mock_where, mock_query):
-    mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
+    mock_where.return_value.where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
@@ -378,13 +379,13 @@ def test_get_with_embedding_filter(article_repo, mock_where, mock_query):
 
     assert len(result) == 1
     mock_where.assert_called_once()
-    mock_where.return_value.order_by.return_value.options.return_value.limit.assert_called_once_with(
+    mock_where.return_value.where.return_value.order_by.return_value.options.return_value.limit.assert_called_once_with(
         20
     )
 
 
 def test_get_sort_by_browses(article_repo, mock_query):
-    mock_query.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
+    mock_query.where.return_value.join.return_value.group_by.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = [
         Article("the aul article", "https://example.com", "This is a test article")
     ]
 
@@ -395,13 +396,17 @@ def test_get_sort_by_browses(article_repo, mock_query):
         func.count(Browsed._browse_id)
         .desc()
         .compare(
-            mock_query.join.return_value.group_by.return_value.order_by.call_args[0][0]
+            mock_query.where.return_value.join.return_value.group_by.return_value.order_by.call_args[
+                0
+            ][
+                0
+            ]
         )
     )
 
 
 def test_get_invalid_sort_by(article_repo, mock_session):
-    mock_query = mock_session.return_value.query.return_value
+    mock_query = mock_session.return_value.query.return_value.where.return_value
     mock_query.options.return_value = mock_query
     mock_query.order_by.return_value = mock_query
     mock_query.limit.return_value.all.return_value = [
@@ -414,3 +419,51 @@ def test_get_invalid_sort_by(article_repo, mock_session):
     mock_session.return_value.query.assert_called_once_with(Article)
     mock_query.order_by.assert_called_once()
     mock_query.limit.assert_called_once_with(20)
+
+
+def test_get_with_min_token_count(article_repo, mock_where):
+    articles = [
+        Article("Test Article", "https://example.com", "This is a test article")
+        for _ in range(10)
+    ]
+    mock_where.return_value.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
+        articles
+    )
+
+    result = article_repo.get(min_token_count=100)
+
+    assert len(result) == len(articles)
+    mock_where.assert_called_once()
+    assert mock_where.call_args[0][0].compare(Article._token_count >= 100)
+
+
+def test_get_with_zero_min_token_count(article_repo, mock_query):
+    articles = [
+        Article("Test Article", "https://example.com", "This is a test article")
+        for _ in range(10)
+    ]
+    mock_query.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
+        articles
+    )
+
+    result = article_repo.get(min_token_count=0)
+
+    assert len(result) == len(articles)
+    # Should not call where() when min_token_count is 0
+    mock_query.where.assert_not_called()
+
+
+def test_get_with_negative_min_token_count(article_repo, mock_query):
+    articles = [
+        Article("Test Article", "https://example.com", "This is a test article")
+        for _ in range(10)
+    ]
+    mock_query.order_by.return_value.options.return_value.limit.return_value.all.return_value = (
+        articles
+    )
+
+    result = article_repo.get(min_token_count=-10)
+
+    assert len(result) == len(articles)
+    # Should not call where() when min_token_count is negative
+    mock_query.where.assert_not_called()

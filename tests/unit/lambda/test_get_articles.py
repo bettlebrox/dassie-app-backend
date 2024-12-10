@@ -135,7 +135,11 @@ def test_get_articles_with_sort_order(article_repo, openai_client, mock_context)
     )
     assert response["statusCode"] == 200
     article_repo.get.assert_called_with(
-        limit=10, sort_by="created_at", descending=False, filter_embedding=None
+        limit=10,
+        sort_by="created_at",
+        descending=False,
+        filter_embedding=None,
+        min_token_count=0,
     )
 
 
@@ -187,7 +191,11 @@ def test_get_articles_with_default_params(article_repo, openai_client, mock_cont
     )
     assert response["statusCode"] == 200
     article_repo.get.assert_called_with(
-        limit=10, sort_by="updated_at", descending=True, filter_embedding=None
+        limit=10,
+        sort_by="updated_at",
+        descending=True,
+        filter_embedding=None,
+        min_token_count=0,
     )
 
 

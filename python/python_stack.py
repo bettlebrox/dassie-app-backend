@@ -19,6 +19,7 @@ import aws_cdk.aws_events as events
 import aws_cdk.aws_events_targets as targets
 from infra_stack import InfraStack
 from python_dependencies_stack import PythonDependenciesStack
+import aws_cdk.aws_lambda_python_alpha as lambda_python
 
 ApiGatewayEndpointStackOutput = "ApiEndpoint"
 ApiGatewayDomainStackOutput = "ApiDomain"
@@ -33,7 +34,8 @@ class PythonStack(Stack):
         construct_id: str,
         dependencies_stack: PythonDependenciesStack,
         infra_stack: InfraStack,
-        runtime: lambda_.Runtime,
+        runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_12,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
         **kwargs,
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -49,13 +51,13 @@ class PythonStack(Stack):
             dependencies_stack.datadog_secret,
             infra_stack.ddb,
         )
-        self.layers = [dependencies_stack.reqs_layer, dependencies_stack.ai_layer]
-
+        self.layers = [dependencies_stack.reqs_layer1, dependencies_stack.ai_layer1]
         lambda_function_props = self._get_default_lambda_props(
             infra_stack.lambda_db_access_sg,
             infra_stack.lambda_neptune_access_sg,
             self.lambdas_env,
             infra_stack.vpc,
+            architecture,
         )
         self.aliases = {}
         self.functions = self._get_lambdas(
@@ -67,7 +69,7 @@ class PythonStack(Stack):
         )
 
         self.archive_navlog = self.create_archive_function(
-            infra_stack.ddb, self.lambdas_env, self.layers[0]
+            infra_stack.ddb, self.lambdas_env, self.layers[0], architecture
         )
         functions_to_dd_instrument = self.functions.copy()
         del functions_to_dd_instrument["build_articles"]
@@ -268,11 +270,12 @@ class PythonStack(Stack):
         lambda_neptune_access_sg,
         lambdas_env,
         vpc,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
     ):
         return {
             "vpc": vpc,
             "security_groups": [lambda_db_access_sg, lambda_neptune_access_sg],
-            "architecture": lambda_.Architecture.ARM_64,
+            "architecture": architecture,
             "memory_size": 1024,
             "environment": lambdas_env,
             "tracing": lambda_.Tracing.PASS_THROUGH,
@@ -392,7 +395,13 @@ class PythonStack(Stack):
         )
         return ddb
 
-    def create_archive_function(self, ddb, lambdas_env, deps_layer):
+    def create_archive_function(
+        self,
+        ddb,
+        lambdas_env,
+        deps_layer,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
+    ):
         # Create an S3 bucket for archiving old DynamoDB items
         archive_bucket = s3.Bucket(
             self,
@@ -420,9 +429,9 @@ class PythonStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="archive_navlog.lambda_handler",
             code=lambda_.AssetCode.from_asset(path.join(os.getcwd(), "python/lambda")),
-            architecture=lambda_.Architecture.ARM_64,
+            architecture=architecture,
             environment=lambdas_env,
-            layers=[deps_layer],
+            layers=[deps_layer] if deps_layer is not None else [],
             timeout=Duration.minutes(1),
         )
 
@@ -453,7 +462,15 @@ class PythonStack(Stack):
                     function.connections.security_groups[0], ec2.Port.tcp(5432)
                 )
 
-    def create_add_navlog_function(self, lambdas_env, ddb, bucket, vpc, layer):
+    def create_add_navlog_function(
+        self,
+        lambdas_env,
+        ddb,
+        bucket,
+        vpc,
+        layer,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
+    ):
         addNavlog = lambda_.Function(
             self,
             "add_navlog1",
@@ -462,7 +479,7 @@ class PythonStack(Stack):
             handler="add_navlog.lambda_handler",
             tracing=lambda_.Tracing.PASS_THROUGH,
             timeout=Duration.seconds(10),
-            layers=[layer],
+            layers=[layer] if layer is not None else [],
             vpc=vpc,
             environment=lambdas_env,
         )
@@ -518,7 +535,7 @@ class PythonStack(Stack):
                     effect=iam.Effect.ALLOW,
                     actions=["execute-api:Invoke"],
                     resources=[
-                        f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*"  # apiID needs to be manually updated if API recreated
+                        f"arn:aws:execute-api:eu-west-1:559845934392:t6pwh7x1a9/prod/*/*/*"  # apiID needs to be manually updated if API recreated
                     ],
                     conditions={"ArnLike": {"AWS:SourceArn": api_role.role_arn}},
                     principals=[iam.ServicePrincipal("apigateway.amazonaws.com")],
@@ -528,7 +545,7 @@ class PythonStack(Stack):
                     effect=iam.Effect.ALLOW,
                     actions=["execute-api:Invoke"],
                     resources=[
-                        f"arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*"  # apiID needs to be manually updated if API recreated
+                        f"arn:aws:execute-api:eu-west-1:559845934392:t6pwh7x1a9/prod/OPTIONS/*"  # apiID needs to be manually updated if API recreated
                     ],
                     principals=[iam.AnyPrincipal()],
                 ),

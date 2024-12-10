@@ -70,6 +70,7 @@ class ArticleRepository(BasePostgresRepository):
         include_score_in_results=False,
         threshold: float = 0.8,
         days: int = None,
+        min_token_count: int = 75,
     ):
         with closing(self._session()) as session:
             query = session.query(self.model)
@@ -95,6 +96,8 @@ class ArticleRepository(BasePostgresRepository):
             )
             if type is not None:
                 query = query.where(Article._type.in_(type))
+            if min_token_count > 0:
+                query = query.where(Article._token_count >= min_token_count)
             if sort_by is None:
                 sort_by = "logged_at"
                 if filter_embedding is not None:

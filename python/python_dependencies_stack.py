@@ -12,6 +12,7 @@ class PythonDependenciesStack(Stack):
         construct_id: str,
         testing: bool = False,
         runtime: lambda_.Runtime = lambda_.Runtime.PYTHON_3_12,
+        architecture: lambda_.Architecture = lambda_.Architecture.X86_64,
         **kwargs,
     ) -> None:
 
@@ -34,8 +35,7 @@ class PythonDependenciesStack(Stack):
                 "RequirementsLayer1",
                 entry="python/layer",
                 compatible_architectures=[
-                    lambda_.Architecture.X86_64,
-                    lambda_.Architecture.ARM_64,
+                    architecture,
                 ],
                 compatible_runtimes=[runtime],
                 description="Requirements layer",
@@ -46,9 +46,38 @@ class PythonDependenciesStack(Stack):
                 "AILayer1",
                 entry="python/layer_ai",
                 compatible_architectures=[
-                    lambda_.Architecture.X86_64,
-                    lambda_.Architecture.ARM_64,
+                    architecture,
                 ],
+                compatible_runtimes=[runtime],
+                description="Another requirements layer - in order to split deps across zip file limits",
+                removal_policy=RemovalPolicy.RETAIN,
+            )
+            self.reqs_layer1 = lambda_python.PythonLayerVersion(
+                self,
+                "RequirementsLayer",
+                entry="python/layer",
+                compatible_architectures=[
+                    architecture,
+                ],
+                bundling=lambda_python.BundlingOptions(
+                    build_args={"PIP_PLATFORM": "linux_arm64"},
+                    image=lambda_.Runtime.PYTHON_3_12.bundling_image,
+                ),
+                compatible_runtimes=[runtime],
+                description="Requirements layer",
+                removal_policy=RemovalPolicy.RETAIN,
+            )
+            self.ai_layer1 = lambda_python.PythonLayerVersion(
+                self,
+                "AILayer",
+                entry="python/layer_ai",
+                compatible_architectures=[
+                    architecture,
+                ],
+                bundling=lambda_python.BundlingOptions(
+                    build_args={"PIP_PLATFORM": "linux_arm64"},
+                    image=lambda_.Runtime.PYTHON_3_12.bundling_image,
+                ),
                 compatible_runtimes=[runtime],
                 description="Another requirements layer - in order to split deps across zip file limits",
                 removal_policy=RemovalPolicy.RETAIN,

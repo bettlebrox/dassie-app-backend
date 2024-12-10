@@ -72,6 +72,7 @@ def lambda_handler(
             sort_by=sort_field,
             descending=sort_order == "desc",
             filter_embedding=filter_embedding,
+            min_token_count=0,
         )
         response["body"] = "[{}]".format(
             ",".join([article.json() for article in result])

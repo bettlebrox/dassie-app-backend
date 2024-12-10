@@ -40,6 +40,7 @@ def lambda_handler(
             threshold=0.5,
             type=[ArticleType.ARTICLE],
             include_score_in_results=True,
+            min_token_count=0,
         )
         themes = theme_repo.get(filter_embedding=embedding, threshold=0.5)
 

@@ -36,7 +36,7 @@ class LambdaInitContext:
         browsed_repo=None,
         release="dev",
     ):
-        logger.info("init lambda context")
+        logger.info("init lambda context ", extra={"release": release})
         self._secrets_manager = secrets_manager
         self._db_secrets = db_secrets
         self._article_repo = article_repo

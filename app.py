@@ -15,6 +15,7 @@ from permissions_stack import PermissionsStack
 import aws_cdk.aws_lambda as lambda_
 
 RUNTIME = lambda_.Runtime.PYTHON_3_12
+ARCHITECTURE = lambda_.Architecture.X86_64
 
 app = cdk.App()
 stack_name = (
@@ -25,6 +26,7 @@ python_dependencies_stack = PythonDependenciesStack(
     "DassiePythonDependenciesStack",
     env=cdk.Environment(account=os.environ["AWS_ACCOUNT_ID"], region="eu-west-1"),
     runtime=RUNTIME,
+    architecture=ARCHITECTURE,
 )
 
 infra_stack = InfraStack(
@@ -40,6 +42,7 @@ python_stack = PythonStack(
     infra_stack=infra_stack,
     env=cdk.Environment(account=os.environ["AWS_ACCOUNT_ID"], region="eu-west-1"),
     runtime=RUNTIME,
+    architecture=ARCHITECTURE,
 )
 python_stack.add_dependency(python_dependencies_stack)
 python_stack.add_dependency(infra_stack)

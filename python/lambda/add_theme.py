@@ -40,7 +40,7 @@ def lambda_handler(
             return response
         theme = theme_service.get_theme_by_original_title(title)
         if theme is not None:
-            response["body"] = json.dumps({"message": "Theme already exists"})
+            response["body"] = theme.json()
             response["statusCode"] = 302
             return response
         theme = theme_service.add_theme(Theme(title, source=ThemeType.CUSTOM))

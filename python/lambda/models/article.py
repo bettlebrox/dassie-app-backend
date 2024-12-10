@@ -71,6 +71,7 @@ class Article(Base):
             "source": self._source_navlog,
             "image": self._image,
             "themes": [theme.json(dump=False) for theme in self._themes],
+            "token_count": self._token_count,
         }
         return json.dumps(json_obj) if dump else json_obj
 
