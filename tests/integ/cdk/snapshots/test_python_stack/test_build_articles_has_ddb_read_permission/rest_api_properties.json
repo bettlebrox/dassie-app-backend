@@ -13,7 +13,7 @@
         "Principal": {
           "Service": "apigateway.amazonaws.com"
         },
-        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/*/*/*",
+        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:t6pwh7x1a9/prod/*/*/*",
         "Sid": "allow_google_cognito"
       },
       {
@@ -22,7 +22,7 @@
         "Principal": {
           "AWS": "*"
         },
-        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:2eh5dqfti6/prod/OPTIONS/*",
+        "Resource": "arn:aws:execute-api:eu-west-1:559845934392:t6pwh7x1a9/prod/OPTIONS/*",
         "Sid": "allow_unauthenticated_options"
       }
     ],

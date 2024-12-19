@@ -29,6 +29,16 @@ class PythonDependenciesStack(Stack):
                 "AILayer",
                 "arn:aws:lambda:eu-west-1:559845934392:layer:AILayerD278B124:1",
             )
+            self.reqs_layer1 = lambda_.LayerVersion.from_layer_version_arn(
+                self,
+                "RequirementsLayer1",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:RequirementsLayer21B3280B:45",
+            )
+            self.ai_layer1 = lambda_.LayerVersion.from_layer_version_arn(
+                self,
+                "AILayer1",
+                "arn:aws:lambda:eu-west-1:559845934392:layer:AILayerD278B124:1",
+            )
         else:
             self.reqs_layer = lambda_python.PythonLayerVersion(
                 self,

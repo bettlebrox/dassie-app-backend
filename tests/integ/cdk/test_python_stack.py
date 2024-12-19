@@ -134,5 +134,6 @@ def test_build_articles_has_ddb_read_permission(backend_template, snapshot):
     assert len(rest_api_resources) == 1
     first_resource = next(iter(rest_api_resources.values()))
     snapshot.assert_match(
-        json.dumps(first_resource["Properties"], indent=2), "rest_api_properties.json"
+        json.dumps(first_resource["Properties"], indent=2),
+        "rest_api_properties.json",
     )
