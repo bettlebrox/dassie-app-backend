@@ -1,4 +1,7 @@
 {
+  "metadata": {
+    "dependency_versions": {}
+  },
   "self": {
     "lm": null,
     "traces": [],
